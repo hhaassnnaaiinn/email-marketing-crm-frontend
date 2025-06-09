@@ -1,0 +1,265 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Users, FileText, Send, TrendingUp, Mail, CheckCircle, XCircle } from "lucide-react"
+import { apiClient } from "@/lib/api"
+import Link from "next/link"
+
+interface Stats {
+  contacts: number
+  templates: number
+  campaigns: number
+  sentEmails: number
+  emailHistory: {
+    sent: number
+    failed: number
+    total: number
+  }
+}
+
+interface RecentActivity {
+  type: string
+  message: string
+  timestamp: string
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<Stats>({
+    contacts: 0,
+    templates: 0,
+    campaigns: 0,
+    sentEmails: 0,
+    emailHistory: { sent: 0, failed: 0, total: 0 },
+  })
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [contacts, templates, campaigns, emailHistory] = await Promise.all([
+          apiClient.getContacts(),
+          apiClient.getTemplates(),
+          apiClient.getCampaigns(),
+          apiClient.getEmailHistory({ limit: 100 }),
+        ])
+
+        const emailStats = emailHistory.emails.reduce(
+          (acc: any, email: any) => {
+            acc.total++
+            if (email.status === "sent") acc.sent++
+            if (email.status === "failed") acc.failed++
+            return acc
+          },
+          { sent: 0, failed: 0, total: 0 },
+        )
+
+        setStats({
+          contacts: contacts.length || 0,
+          templates: templates.length || 0,
+          campaigns: campaigns.length || 0,
+          sentEmails: campaigns.filter((c: any) => c.status === "sent").length || 0,
+          emailHistory: emailStats,
+        })
+
+        // Generate recent activity from email history
+        const activity = emailHistory.emails.slice(0, 5).map((email: any) => ({
+          type: email.status,
+          message: `Email "${email.subject}" ${email.status === "sent" ? "sent to" : "failed for"} ${email.to}`,
+          timestamp: email.createdAt,
+        }))
+        setRecentActivity(activity)
+      } catch (error) {
+        console.error("Failed to fetch stats:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  const statCards = [
+    {
+      title: "Total Contacts",
+      value: stats.contacts,
+      description: "Active contacts in your database",
+      icon: Users,
+      color: "text-blue-600",
+      href: "/dashboard/contacts",
+    },
+    {
+      title: "Email Templates",
+      value: stats.templates,
+      description: "Ready-to-use email templates",
+      icon: FileText,
+      color: "text-green-600",
+      href: "/dashboard/templates",
+    },
+    {
+      title: "Campaigns",
+      value: stats.campaigns,
+      description: "Total email campaigns created",
+      icon: Send,
+      color: "text-purple-600",
+      href: "/dashboard/campaigns",
+    },
+    {
+      title: "Emails Sent",
+      value: stats.emailHistory.sent,
+      description: "Successfully delivered emails",
+      icon: TrendingUp,
+      color: "text-orange-600",
+      href: "/dashboard/email-history",
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
+                <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-16 animate-pulse mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-32 animate-pulse"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">Welcome to your Email Marketing CRM dashboard</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((card) => (
+          <Link key={card.title} href={card.href}>
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                <card.icon className={`h-4 w-4 ${card.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{card.value}</div>
+                <p className="text-xs text-muted-foreground">{card.description}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Performance</CardTitle>
+            <CardDescription>Overview of your email delivery statistics</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm">Successfully Sent</span>
+              </div>
+              <span className="font-medium">{stats.emailHistory.sent}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <span className="text-sm">Failed</span>
+              </div>
+              <span className="font-medium">{stats.emailHistory.failed}</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-2">
+              <div className="flex items-center space-x-2">
+                <Mail className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium">Total Emails</span>
+              </div>
+              <span className="font-bold">{stats.emailHistory.total}</span>
+            </div>
+            <Link href="/dashboard/email-history">
+              <Button variant="outline" size="sm" className="w-full mt-4">
+                View Email History
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest email activity in your CRM</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No recent activity to display</p>
+              ) : (
+                recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-2">
+                    {activity.type === "sent" ? (
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 truncate">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(activity.timestamp).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common tasks to get you started</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Link href="/dashboard/contacts">
+              <Button variant="outline" className="w-full justify-start">
+                <Users className="h-4 w-4 mr-2" />
+                Add Contacts
+              </Button>
+            </Link>
+            <Link href="/dashboard/templates">
+              <Button variant="outline" className="w-full justify-start">
+                <FileText className="h-4 w-4 mr-2" />
+                Create Template
+              </Button>
+            </Link>
+            <Link href="/dashboard/campaigns">
+              <Button variant="outline" className="w-full justify-start">
+                <Send className="h-4 w-4 mr-2" />
+                New Campaign
+              </Button>
+            </Link>
+            <Link href="/dashboard/bulk-email">
+              <Button variant="outline" className="w-full justify-start">
+                <Mail className="h-4 w-4 mr-2" />
+                Send Bulk Email
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
