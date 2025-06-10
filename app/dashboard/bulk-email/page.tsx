@@ -101,11 +101,28 @@ export default function BulkEmailPage() {
       setEmailData({ subject: "", html: "", batchSize: 50 })
       setSelectedContacts([])
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send bulk email",
-        variant: "destructive",
-      })
+      // Check if the error is about unsubscribed recipient
+      const errorMessage = error instanceof Error ? error.message : "Failed to send bulk email"
+      
+      if (errorMessage.includes("All recipients have unsubscribed from emails")) {
+        toast({
+          title: "Cannot Send Bulk Email",
+          description: "All recipients have unsubscribed from emails",
+          variant: "destructive",
+        })
+      } else if (errorMessage.includes("Recipient has unsubscribed from emails")) {
+        toast({
+          title: "Cannot Send Bulk Email",
+          description: "One or more recipients have unsubscribed from emails",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to send bulk email",
+          variant: "destructive",
+        })
+      }
     } finally {
       setSending(false)
     }

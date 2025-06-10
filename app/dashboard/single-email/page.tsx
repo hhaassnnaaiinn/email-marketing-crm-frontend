@@ -112,11 +112,22 @@ export default function SingleEmailPage() {
       setEmailData({ to: "", subject: "", html: "" })
       setSelectedTemplate("")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to send email",
-        variant: "destructive",
-      })
+      // Check if the error is about unsubscribed recipient
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email"
+      
+      if (errorMessage.includes("Recipient has unsubscribed from emails")) {
+        toast({
+          title: "Cannot Send Email",
+          description: "Recipient has unsubscribed from emails",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to send email",
+          variant: "destructive",
+        })
+      }
     } finally {
       setSending(false)
     }

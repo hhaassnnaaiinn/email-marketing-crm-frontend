@@ -10,6 +10,15 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -61,6 +70,8 @@ export default function CampaignsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -206,6 +217,14 @@ export default function CampaignsPage() {
     }
   }
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedContacts(contacts.map((c) => c._id))
+    } else {
+      setSelectedContacts([])
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: "secondary",
@@ -224,6 +243,21 @@ export default function CampaignsPage() {
       campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       campaign.subject.toLowerCase().includes(searchTerm.toLowerCase()),
   )
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentCampaigns = filteredCampaigns.slice(startIndex, endIndex)
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -312,6 +346,16 @@ export default function CampaignsPage() {
                   <Label>Recipients ({selectedContacts.length} selected)</Label>
                   <div className="border rounded-md p-4 max-h-48 overflow-y-auto">
                     <div className="space-y-2">
+                      <div className="flex items-center space-x-2 pb-2 border-b">
+                        <Checkbox
+                          id="select-all-contacts"
+                          checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                        <Label htmlFor="select-all-contacts" className="text-sm font-medium">
+                          Select All ({contacts.length} contacts)
+                        </Label>
+                      </div>
                       {contacts.map((contact) => (
                         <div key={contact._id} className="flex items-center space-x-2">
                           <Checkbox
@@ -418,14 +462,14 @@ export default function CampaignsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCampaigns.length === 0 ? (
+                  {currentCampaigns.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-4">
                         No campaigns found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredCampaigns.map((campaign) => (
+                    currentCampaigns.map((campaign) => (
                       <TableRow key={campaign._id}>
                         <TableCell className="font-medium">
                           <div>
@@ -465,6 +509,83 @@ export default function CampaignsPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {!loading && filteredCampaigns.length > 0 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredCampaigns.length)} of {filteredCampaigns.length} campaigns
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {/* First page */}
+                  {currentPage > 2 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Ellipsis */}
+                  {currentPage > 3 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Previous page */}
+                  {currentPage > 1 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(currentPage - 1)}>
+                        {currentPage - 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Current page */}
+                  <PaginationItem>
+                    <PaginationLink isActive>{currentPage}</PaginationLink>
+                  </PaginationItem>
+                  
+                  {/* Next page */}
+                  {currentPage < totalPages && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(currentPage + 1)}>
+                        {currentPage + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Ellipsis */}
+                  {currentPage < totalPages - 2 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Last page */}
+                  {currentPage < totalPages - 1 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(totalPages)}>{totalPages}</PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </CardContent>

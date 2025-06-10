@@ -8,6 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import {
   Dialog,
   DialogContent,
@@ -17,9 +28,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Edit, Trash2, Search, Upload, Download } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Upload, Download, Mail, MailX } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface Contact {
   _id: string
@@ -34,12 +46,16 @@ interface Contact {
   zip?: string
   email: string
   createdAt: string
+  unsubscribed?: boolean
 }
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -55,6 +71,7 @@ export default function ContactsPage() {
     state: "",
     zip: "",
     email: "",
+    unsubscribed: false,
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
@@ -111,7 +128,7 @@ export default function ContactsPage() {
       }
       setIsDialogOpen(false)
       setEditingContact(null)
-      setFormData({ company: "", fullName: "", workPhone: "", mobilePhone: "", role: "", address: "", city: "", state: "", zip: "", email: "" })
+      setFormData({ company: "", fullName: "", workPhone: "", mobilePhone: "", role: "", address: "", city: "", state: "", zip: "", email: "", unsubscribed: false })
       fetchContacts()
     } catch (error) {
       toast({
@@ -135,6 +152,7 @@ export default function ContactsPage() {
       state: contact?.state || "",
       zip: contact?.zip || "",
       email: contact?.email || "",
+      unsubscribed: contact?.unsubscribed || false,
     })
     setIsDialogOpen(true)
   }
@@ -214,15 +232,62 @@ export default function ContactsPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  const getStatusBadge = (unsubscribed: boolean) => {
+    if (unsubscribed === true) {
+      return (
+        <Badge variant="destructive" className="flex items-center gap-1">
+          <MailX className="h-3 w-3" />
+          Unsubscribed
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="default" className="flex items-center gap-1">
+          <Mail className="h-3 w-3" />
+          Subscribed
+        </Badge>
+      )
+    }
+  }
+
+  // Pagination logic
   const filteredContacts = contacts.filter(
-    (contact) =>
-      (contact?.fullName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (contact?.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (contact?.company?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (contact?.role?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (contact?.city?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (contact?.state?.toLowerCase() || '').includes(searchTerm.toLowerCase()),
+    (contact) => {
+      // Text search filter
+      const matchesSearch = 
+        (contact?.fullName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (contact?.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (contact?.company?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (contact?.role?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (contact?.city?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (contact?.state?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+
+      // Status filter
+      let matchesStatus = true
+      if (statusFilter === "subscribed") {
+        matchesStatus = !(contact?.unsubscribed || false)
+      } else if (statusFilter === "unsubscribed") {
+        matchesStatus = contact?.unsubscribed || false
+      }
+
+      return matchesSearch && matchesStatus
+    }
   )
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredContacts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentContacts = filteredContacts.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -272,7 +337,7 @@ export default function ContactsPage() {
               <Button
                 onClick={() => {
                   setEditingContact(null)
-                  setFormData({ company: "", fullName: "", workPhone: "", mobilePhone: "", role: "", address: "", city: "", state: "", zip: "", email: "" })
+                  setFormData({ company: "", fullName: "", workPhone: "", mobilePhone: "", role: "", address: "", city: "", state: "", zip: "", email: "", unsubscribed: false })
                 }}
                 className="w-full sm:w-auto"
               >
@@ -389,6 +454,24 @@ export default function ContactsPage() {
                       />
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unsubscribed" className="flex items-center space-x-2">
+                      <span>Email Subscription Status</span>
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="unsubscribed"
+                        checked={formData.unsubscribed}
+                        onCheckedChange={(checked) => setFormData({ ...formData, unsubscribed: checked as boolean })}
+                      />
+                      <Label htmlFor="unsubscribed" className="text-sm">
+                        Unsubscribed from emails
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Check this box if the contact has unsubscribed from email communications
+                    </p>
+                  </div>
                 </div>
                 <DialogFooter className="mt-6">
                   <Button type="submit" className="w-full sm:w-auto">{editingContact ? "Update Contact" : "Add Contact"}</Button>
@@ -403,14 +486,29 @@ export default function ContactsPage() {
         <CardHeader>
           <CardTitle className="text-lg sm:text-xl">All Contacts ({contacts?.length || 0})</CardTitle>
           <CardDescription className="text-sm">A list of all your email marketing contacts</CardDescription>
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search contacts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Search className="h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search contacts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="status-filter" className="text-sm font-medium">Status:</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Contacts</SelectItem>
+                  <SelectItem value="subscribed">Subscribed</SelectItem>
+                  <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -427,19 +525,20 @@ export default function ContactsPage() {
                     <TableHead className="min-w-[100px] hidden md:table-cell">Role</TableHead>
                     <TableHead className="min-w-[120px] hidden lg:table-cell">Phone</TableHead>
                     <TableHead className="min-w-[100px] hidden lg:table-cell">Location</TableHead>
+                    <TableHead className="min-w-[120px]">Status</TableHead>
                     <TableHead className="min-w-[100px] hidden md:table-cell">Created</TableHead>
                     <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredContacts.length === 0 ? (
+                  {currentContacts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-4">
+                      <TableCell colSpan={9} className="text-center py-4">
                         No contacts found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredContacts.map((contact) => (
+                    currentContacts.map((contact) => (
                       <TableRow key={contact?._id || Math.random()}>
                         <TableCell className="font-medium">
                           <div>
@@ -468,6 +567,9 @@ export default function ContactsPage() {
                             </div>
                           ) : '-'}
                         </TableCell>
+                        <TableCell>
+                          {getStatusBadge(contact?.unsubscribed || false)}
+                        </TableCell>
                         <TableCell className="hidden md:table-cell">{contact?.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-1 sm:space-x-2">
@@ -484,6 +586,83 @@ export default function ContactsPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {!loading && filteredContacts.length > 0 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredContacts.length)} of {filteredContacts.length} contacts
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {/* First page */}
+                  {currentPage > 2 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Ellipsis */}
+                  {currentPage > 3 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Previous page */}
+                  {currentPage > 1 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(currentPage - 1)}>
+                        {currentPage - 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Current page */}
+                  <PaginationItem>
+                    <PaginationLink isActive>{currentPage}</PaginationLink>
+                  </PaginationItem>
+                  
+                  {/* Next page */}
+                  {currentPage < totalPages && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(currentPage + 1)}>
+                        {currentPage + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Ellipsis */}
+                  {currentPage < totalPages - 2 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+                  
+                  {/* Last page */}
+                  {currentPage < totalPages - 1 && (
+                    <PaginationItem>
+                      <PaginationLink onClick={() => handlePageChange(totalPages)}>{totalPages}</PaginationLink>
+                    </PaginationItem>
+                  )}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           )}
         </CardContent>
