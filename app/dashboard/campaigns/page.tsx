@@ -31,12 +31,7 @@ interface Campaign {
   status: "draft" | "sent"
   scheduledAt?: string
   sentAt?: string
-  template: {
-    _id: string
-    name: string
-    subject: string
-    body: string
-  }
+  templateId: string // <-- use templateId instead of template object
   contacts: Array<{
     _id: string
     firstName: string
@@ -74,7 +69,7 @@ export default function CampaignsPage() {
   const [formData, setFormData] = useState({
     name: "",
     subject: "",
-    template: "",
+    templateId: "", // <-- use templateId
     scheduledAt: "",
   })
   const { toast } = useToast()
@@ -127,7 +122,7 @@ export default function CampaignsPage() {
       }
       setIsDialogOpen(false)
       setEditingCampaign(null)
-      setFormData({ name: "", subject: "", template: "", scheduledAt: "" })
+      setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
       setSelectedContacts([])
       fetchData()
     } catch (error) {
@@ -144,7 +139,7 @@ export default function CampaignsPage() {
     setFormData({
       name: campaign.name,
       subject: campaign.subject,
-      template: campaign.template._id,
+      templateId: campaign.templateId, // <-- use templateId
       scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : "",
     })
     setSelectedContacts(campaign.contacts.map((c) => c._id))
@@ -231,26 +226,27 @@ export default function CampaignsPage() {
   )
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Email Campaigns</h1>
-          <p className="text-muted-foreground">Create and manage your email marketing campaigns</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Email Campaigns</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Create and manage your email marketing campaigns</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={() => {
                 setEditingCampaign(null)
-                setFormData({ name: "", subject: "", template: "", scheduledAt: "" })
+                setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
                 setSelectedContacts([])
               }}
+              className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Campaign
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingCampaign ? "Edit Campaign" : "Create New Campaign"}</DialogTitle>
               <DialogDescription>
@@ -259,7 +255,7 @@ export default function CampaignsPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Campaign Name</Label>
                     <Input
@@ -295,10 +291,10 @@ export default function CampaignsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="template">Template</Label>
+                  <Label htmlFor="templateId">Template</Label>
                   <Select
-                    value={formData.template}
-                    onValueChange={(value) => setFormData({ ...formData, template: value })}
+                    value={formData.templateId}
+                    onValueChange={(value) => setFormData({ ...formData, templateId: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a template" />
@@ -333,7 +329,7 @@ export default function CampaignsPage() {
                 </div>
               </div>
               <DialogFooter className="mt-6">
-                <Button type="submit">{editingCampaign ? "Update Campaign" : "Create Campaign"}</Button>
+                <Button type="submit" className="w-full sm:w-auto">{editingCampaign ? "Update Campaign" : "Create Campaign"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -342,13 +338,13 @@ export default function CampaignsPage() {
 
       {/* Campaign View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Campaign Details</DialogTitle>
           </DialogHeader>
           {viewingCampaign && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Campaign Name</Label>
                   <p className="text-sm text-muted-foreground">{viewingCampaign.name}</p>
@@ -364,11 +360,13 @@ export default function CampaignsPage() {
               </div>
               <div>
                 <Label className="text-sm font-medium">Template</Label>
-                <p className="text-sm text-muted-foreground">{viewingCampaign.template.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {templates.find(t => t._id === viewingCampaign.templateId)?.name || "N/A"}
+                </p>
               </div>
               <div>
                 <Label className="text-sm font-medium">Recipients ({viewingCampaign.contacts.length})</Label>
-                <div className="mt-2 space-y-1">
+                <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                   {viewingCampaign.contacts.map((contact) => (
                     <p key={contact._id} className="text-sm text-muted-foreground">
                       {contact.firstName} {contact.lastName} ({contact.email})
@@ -379,8 +377,8 @@ export default function CampaignsPage() {
               <div>
                 <Label className="text-sm font-medium">Email Content</Label>
                 <div
-                  className="mt-2 p-4 border rounded-md bg-gray-50 max-h-64 overflow-y-auto"
-                  dangerouslySetInnerHTML={{ __html: viewingCampaign.template.body }}
+                  className="mt-2 p-4 border rounded-md bg-gray-50 max-h-64 overflow-y-auto overflow-x-auto"
+                  dangerouslySetInnerHTML={{ __html: viewingCampaign.template?.body || "" }}
                 />
               </div>
             </div>
@@ -390,8 +388,8 @@ export default function CampaignsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Campaigns ({campaigns.length})</CardTitle>
-          <CardDescription>Manage your email marketing campaigns</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">All Campaigns ({campaigns.length})</CardTitle>
+          <CardDescription className="text-sm">Manage your email marketing campaigns</CardDescription>
           <div className="flex items-center space-x-2">
             <Search className="h-4 w-4 text-gray-400" />
             <Input
@@ -406,61 +404,68 @@ export default function CampaignsPage() {
           {loading ? (
             <div className="text-center py-4">Loading campaigns...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Recipients</TableHead>
-                  <TableHead>Scheduled</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCampaigns.length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-4">
-                      No campaigns found
-                    </TableCell>
+                    <TableHead className="min-w-[150px]">Name</TableHead>
+                    <TableHead className="min-w-[200px] hidden sm:table-cell">Subject</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead className="min-w-[80px] hidden md:table-cell">Recipients</TableHead>
+                    <TableHead className="min-w-[120px] hidden lg:table-cell">Scheduled</TableHead>
+                    <TableHead className="min-w-[100px] hidden md:table-cell">Created</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredCampaigns.map((campaign) => (
-                    <TableRow key={campaign._id}>
-                      <TableCell className="font-medium">{campaign.name}</TableCell>
-                      <TableCell>{campaign.subject}</TableCell>
-                      <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{campaign.contacts.length}</TableCell>
-                      <TableCell>
-                        {campaign.scheduledAt ? new Date(campaign.scheduledAt).toLocaleString() : "Not scheduled"}
-                      </TableCell>
-                      <TableCell>{new Date(campaign.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => handleView(campaign)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {campaign.status === "draft" && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => handleEdit(campaign)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleSendCampaign(campaign._id)}>
-                                <Send className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          <Button variant="outline" size="sm" onClick={() => handleDelete(campaign._id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredCampaigns.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-4">
+                        No campaigns found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    filteredCampaigns.map((campaign) => (
+                      <TableRow key={campaign._id}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <div className="font-medium">{campaign.name}</div>
+                            <div className="text-xs text-muted-foreground sm:hidden truncate max-w-[200px]">{campaign.subject}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell max-w-[200px] truncate">{campaign.subject}</TableCell>
+                        <TableCell>{getStatusBadge(campaign.status)}</TableCell>
+                        <TableCell className="hidden md:table-cell">{campaign.contacts.length}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {campaign.scheduledAt ? new Date(campaign.scheduledAt).toLocaleString() : "Not scheduled"}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{new Date(campaign.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-1 sm:space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleView(campaign)}>
+                              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                            {campaign.status === "draft" && (
+                              <>
+                                <Button variant="outline" size="sm" onClick={() => handleEdit(campaign)}>
+                                  <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleSendCampaign(campaign._id)}>
+                                  <Send className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                              </>
+                            )}
+                            <Button variant="outline" size="sm" onClick={() => handleDelete(campaign._id)}>
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

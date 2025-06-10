@@ -189,14 +189,14 @@ export class ApiClient {
     fromEmail: string
   }) {
     return this.request("/aws-settings", {
-      method: "POST",
+      method: "PUT",
       body: JSON.stringify(settings),
     })
   }
 
   async verifyAwsSettings() {
     return this.request("/aws-settings/verify", {
-      method: "POST",
+      method: "PUT",
     })
   }
 

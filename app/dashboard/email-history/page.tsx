@@ -19,7 +19,7 @@ interface EmailLog {
   messageId?: string
   error?: string
   type: "single" | "bulk" | "test"
-  createdAt: string
+  sentAt: string
 }
 
 interface EmailHistory {
@@ -161,13 +161,13 @@ export default function EmailHistoryPage() {
     ) || []
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Email History</h1>
-          <p className="text-muted-foreground">Track all sent emails and their delivery status</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Email History</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Track all sent emails and their delivery status</p>
         </div>
-        <Button onClick={handleSendTestEmail}>
+        <Button onClick={handleSendTestEmail} className="w-full sm:w-auto">
           <Send className="h-4 w-4 mr-2" />
           Send Test Email
         </Button>
@@ -175,11 +175,11 @@ export default function EmailHistoryPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Email Logs</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Email Logs</CardTitle>
+          <CardDescription className="text-sm">
             {emailHistory?.pagination ? `${emailHistory.pagination.totalItems} total emails` : "Loading..."}
           </CardDescription>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center space-x-2">
               <Search className="h-4 w-4 text-gray-400" />
               <Input
@@ -189,27 +189,29 @@ export default function EmailHistoryPage() {
                 className="max-w-sm"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="single">Single</SelectItem>
-                <SelectItem value="bulk">Bulk</SelectItem>
-                <SelectItem value="test">Test</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="single">Single</SelectItem>
+                  <SelectItem value="bulk">Bulk</SelectItem>
+                  <SelectItem value="test">Test</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -217,48 +219,55 @@ export default function EmailHistoryPage() {
             <div className="text-center py-4">Loading email history...</div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Recipient</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Message ID</TableHead>
-                    <TableHead>Sent At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredEmails.length === 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        No emails found
-                      </TableCell>
+                      <TableHead className="min-w-[150px]">Recipient</TableHead>
+                      <TableHead className="min-w-[200px] hidden sm:table-cell">Subject</TableHead>
+                      <TableHead className="min-w-[80px]">Status</TableHead>
+                      <TableHead className="min-w-[80px] hidden md:table-cell">Type</TableHead>
+                      <TableHead className="min-w-[120px] hidden lg:table-cell">Message ID</TableHead>
+                      <TableHead className="min-w-[120px] hidden md:table-cell">Sent At</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredEmails.map((email) => (
-                      <TableRow key={email?._id || Math.random()}>
-                        <TableCell className="font-medium">{email?.to || 'N/A'}</TableCell>
-                        <TableCell>{email?.subject || 'N/A'}</TableCell>
-                        <TableCell>{getStatusBadge(email?.status || 'unknown')}</TableCell>
-                        <TableCell>{getTypeBadge(email?.type || 'unknown')}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {email?.messageId ? email.messageId.slice(0, 20) + "..." : "-"}
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEmails.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4">
+                          No emails found
                         </TableCell>
-                        <TableCell>{email?.createdAt ? new Date(email.createdAt).toLocaleString() : 'N/A'}</TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredEmails.map((email) => (
+                        <TableRow key={email?._id || Math.random()}>
+                          <TableCell className="font-medium">
+                            <div>
+                              <div className="font-medium">{email?.to || 'N/A'}</div>
+                              <div className="text-xs text-muted-foreground sm:hidden truncate max-w-[200px]">{email?.subject || 'N/A'}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell max-w-[200px] truncate">{email?.subject || 'N/A'}</TableCell>
+                          <TableCell>{getStatusBadge(email?.status || 'unknown')}</TableCell>
+                          <TableCell className="hidden md:table-cell">{getTypeBadge(email?.type || 'unknown')}</TableCell>
+                          <TableCell className="hidden lg:table-cell font-mono text-xs">
+                            {email?.messageId ? email.messageId.slice(0, 20) + "..." : "-"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">{email?.sentAt ? new Date(email.sentAt).toLocaleString() : 'N/A'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
 
               {/* Pagination */}
               {emailHistory?.pagination && emailHistory.pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
+                  <p className="text-sm text-muted-foreground text-center sm:text-left">
                     Page {emailHistory.pagination.currentPage} of {emailHistory.pagination.totalPages}
                   </p>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-center sm:justify-end space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -266,7 +275,7 @@ export default function EmailHistoryPage() {
                       disabled={!emailHistory.pagination.hasPrev}
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      <span className="hidden sm:inline">Previous</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -274,7 +283,7 @@ export default function EmailHistoryPage() {
                       onClick={() => setCurrentPage(currentPage + 1)}
                       disabled={!emailHistory.pagination.hasNext}
                     >
-                      Next
+                      <span className="hidden sm:inline">Next</span>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

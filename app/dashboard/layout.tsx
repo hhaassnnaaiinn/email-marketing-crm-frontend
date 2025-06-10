@@ -6,6 +6,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { Footer } from "@/components/footer"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function DashboardLayout({
@@ -34,7 +35,12 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <main className="flex-1 overflow-auto">{children}</main>
+        <div className="flex flex-col min-h-screen">
+          {/* Mobile top spacing to account for hamburger button */}
+          <div className="lg:hidden h-16"></div>
+          <main className="flex-1 overflow-auto px-4 sm:px-6 lg:px-8">{children}</main>
+          <Footer />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

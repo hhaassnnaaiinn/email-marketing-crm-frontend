@@ -154,21 +154,21 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your account and application settings</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Manage your account and application settings</p>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-4 sm:gap-6">
         {/* Profile Settings */}
         <Card>
           <CardHeader>
             <div className="flex items-center space-x-2">
-              <User className="h-5 w-5" />
-              <CardTitle>Profile Information</CardTitle>
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+              <CardTitle className="text-lg sm:text-xl">Profile Information</CardTitle>
             </div>
-            <CardDescription>Update your account information</CardDescription>
+            <CardDescription className="text-sm">Update your account information</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleProfileSubmit} className="space-y-4">
@@ -183,7 +183,7 @@ export default function SettingsPage() {
                   required
                 />
               </div>
-              <Button type="submit" disabled={profileLoading}>
+              <Button type="submit" disabled={profileLoading} className="w-full sm:w-auto">
                 {profileLoading ? "Updating..." : "Update Profile"}
               </Button>
             </form>
@@ -195,10 +195,10 @@ export default function SettingsPage() {
         {/* AWS SES Settings */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center space-x-2">
-                <Cloud className="h-5 w-5" />
-                <CardTitle>AWS SES Configuration</CardTitle>
+                <Cloud className="h-4 w-4 sm:h-5 sm:w-5" />
+                <CardTitle className="text-lg sm:text-xl">AWS SES Configuration</CardTitle>
               </div>
               <div className="flex items-center space-x-2">
                 {awsSettings.isVerified ? (
@@ -214,7 +214,7 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-            <CardDescription>Configure your AWS Simple Email Service settings for sending emails</CardDescription>
+            <CardDescription className="text-sm">Configure your AWS Simple Email Service settings for sending emails</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAwsSubmit} className="space-y-4">
@@ -269,11 +269,11 @@ export default function SettingsPage() {
                   required
                 />
               </div>
-              <div className="flex space-x-2">
-                <Button type="submit" disabled={loading}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                   {loading ? "Updating..." : "Update AWS Settings"}
                 </Button>
-                <Button type="button" variant="outline" onClick={handleVerifyAws} disabled={verifying}>
+                <Button type="button" variant="outline" onClick={handleVerifyAws} disabled={verifying} className="w-full sm:w-auto">
                   {verifying ? "Verifying..." : "Verify Settings"}
                 </Button>
               </div>
@@ -281,7 +281,7 @@ export default function SettingsPage() {
 
             <div className="mt-4 p-4 bg-blue-50 rounded-lg">
               <div className="flex items-start space-x-2">
-                <Shield className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium text-blue-900">Security Note</p>
                   <p className="text-blue-700 mt-1">

@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Send, Users, Mail } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { RichTextEditor } from "@/components/rich-text-editor"
 
 interface Contact {
   _id: string
@@ -112,21 +112,21 @@ export default function BulkEmailPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bulk Email</h1>
-        <p className="text-muted-foreground">Send emails to multiple contacts at once</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bulk Email</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Send emails to multiple contacts at once</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         {/* Email Composition */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Mail className="h-5 w-5" />
+            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
+              <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
               <span>Compose Email</span>
             </CardTitle>
-            <CardDescription>Create your bulk email content</CardDescription>
+            <CardDescription className="text-sm">Create your bulk email content</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSendBulkEmail} className="space-y-4">
@@ -140,17 +140,13 @@ export default function BulkEmailPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="html">Email Content (HTML)</Label>
-                <Textarea
-                  id="html"
-                  value={emailData.html}
-                  onChange={(e) => setEmailData({ ...emailData, html: e.target.value })}
-                  placeholder="Enter your email content in HTML format..."
-                  className="min-h-[200px]"
-                  required
-                />
-              </div>
+              <RichTextEditor
+                label="Email Content"
+                value={emailData.html}
+                onChange={(value) => setEmailData({ ...emailData, html: value })}
+                placeholder="Enter your email content..."
+                required
+              />
               <div className="space-y-2">
                 <Label htmlFor="batchSize">Batch Size</Label>
                 <Input
@@ -158,15 +154,8 @@ export default function BulkEmailPage() {
                   type="number"
                   min="1"
                   max="100"
-                  value={emailData.batchSize || ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const parsedValue = Number.parseInt(value);
-                    setEmailData({ 
-                      ...emailData, 
-                      batchSize: isNaN(parsedValue) ? 50 : parsedValue 
-                    });
-                  }}
+                  value={emailData.batchSize}
+                  onChange={(e) => setEmailData({ ...emailData, batchSize: Number.parseInt(e.target.value) })}
                   placeholder="50"
                 />
                 <p className="text-xs text-muted-foreground">Number of emails to send per batch (recommended: 50)</p>
@@ -182,11 +171,11 @@ export default function BulkEmailPage() {
         {/* Recipient Selection */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5" />
+            <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               <span>Select Recipients</span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm">
               Choose contacts to receive your bulk email ({selectedContacts.length} of {contacts.length} selected)
             </CardDescription>
           </CardHeader>
@@ -201,7 +190,7 @@ export default function BulkEmailPage() {
                     checked={selectedContacts.length === contacts.length && contacts.length > 0}
                     onCheckedChange={handleSelectAll}
                   />
-                  <Label htmlFor="select-all" className="font-medium">
+                  <Label htmlFor="select-all" className="font-medium text-sm">
                     Select All ({contacts.length} contacts)
                   </Label>
                 </div>
@@ -215,11 +204,11 @@ export default function BulkEmailPage() {
                           onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
                         />
                         <Label htmlFor={contact._id} className="text-sm flex-1">
-                          <div className="flex justify-between">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>
                               {contact.firstName} {contact.lastName}
                             </span>
-                            <span className="text-muted-foreground">{contact.email}</span>
+                            <span className="text-muted-foreground text-xs sm:text-sm">{contact.email}</span>
                           </div>
                         </Label>
                       </div>
@@ -243,12 +232,12 @@ export default function BulkEmailPage() {
       {emailData.html && (
         <Card>
           <CardHeader>
-            <CardTitle>Email Preview</CardTitle>
-            <CardDescription>Preview how your email will look to recipients</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Email Preview</CardTitle>
+            <CardDescription className="text-sm">Preview how your email will look to recipients</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-md p-4 bg-gray-50">
-              <div className="mb-4">
+            <div className="border rounded-md p-4 bg-white overflow-x-auto">
+              <div className="mb-4 pb-4 border-b">
                 <strong>Subject:</strong> {emailData.subject}
               </div>
               <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: emailData.html }} />

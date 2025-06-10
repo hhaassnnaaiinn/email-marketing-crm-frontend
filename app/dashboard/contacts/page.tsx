@@ -225,21 +225,21 @@ export default function ContactsPage() {
   )
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
-          <p className="text-muted-foreground">Manage your email marketing contacts</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Contacts</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your email marketing contacts</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <Upload className="h-4 w-4 mr-2" />
                 Upload CSV
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Upload Contacts</DialogTitle>
                 <DialogDescription>
@@ -274,12 +274,13 @@ export default function ContactsPage() {
                   setEditingContact(null)
                   setFormData({ company: "", fullName: "", workPhone: "", mobilePhone: "", role: "", address: "", city: "", state: "", zip: "", email: "" })
                 }}
+                className="w-full sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingContact ? "Edit Contact" : "Add New Contact"}</DialogTitle>
                 <DialogDescription>
@@ -288,7 +289,7 @@ export default function ContactsPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="company">Company *</Label>
                       <Input
@@ -321,7 +322,7 @@ export default function ContactsPage() {
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="workPhone">Work Phone</Label>
                       <Input
@@ -359,7 +360,7 @@ export default function ContactsPage() {
                       placeholder="Enter address"
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city">City</Label>
                       <Input
@@ -390,7 +391,7 @@ export default function ContactsPage() {
                   </div>
                 </div>
                 <DialogFooter className="mt-6">
-                  <Button type="submit">{editingContact ? "Update Contact" : "Add Contact"}</Button>
+                  <Button type="submit" className="w-full sm:w-auto">{editingContact ? "Update Contact" : "Add Contact"}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -400,8 +401,8 @@ export default function ContactsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Contacts ({contacts?.length || 0})</CardTitle>
-          <CardDescription>A list of all your email marketing contacts</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">All Contacts ({contacts?.length || 0})</CardTitle>
+          <CardDescription className="text-sm">A list of all your email marketing contacts</CardDescription>
           <div className="flex items-center space-x-2">
             <Search className="h-4 w-4 text-gray-400" />
             <Input
@@ -416,69 +417,74 @@ export default function ContactsPage() {
           {loading ? (
             <div className="text-center py-4">Loading contacts...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredContacts.length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-4">
-                      No contacts found
-                    </TableCell>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="min-w-[120px] hidden sm:table-cell">Company</TableHead>
+                    <TableHead className="min-w-[180px]">Email</TableHead>
+                    <TableHead className="min-w-[100px] hidden md:table-cell">Role</TableHead>
+                    <TableHead className="min-w-[120px] hidden lg:table-cell">Phone</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Location</TableHead>
+                    <TableHead className="min-w-[100px] hidden md:table-cell">Created</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredContacts.map((contact) => (
-                    <TableRow key={contact?._id || Math.random()}>
-                      <TableCell className="font-medium">
-                        {contact?.fullName || 'N/A'}
-                      </TableCell>
-                      <TableCell>{contact?.company || 'N/A'}</TableCell>
-                      <TableCell>{contact?.email || 'N/A'}</TableCell>
-                      <TableCell>{contact?.role || '-'}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {contact?.workPhone && (
-                            <div className="text-xs text-muted-foreground">Work: {contact.workPhone}</div>
-                          )}
-                          {contact?.mobilePhone && (
-                            <div className="text-xs text-muted-foreground">Mobile: {contact.mobilePhone}</div>
-                          )}
-                          {!contact?.workPhone && !contact?.mobilePhone && '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {contact?.city || contact?.state ? (
-                          <div className="text-xs">
-                            {contact?.city && contact?.state ? `${contact.city}, ${contact.state}` : contact?.city || contact?.state}
-                          </div>
-                        ) : '-'}
-                      </TableCell>
-                      <TableCell>{contact?.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => handleEdit(contact)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleDelete(contact?._id || '')}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredContacts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-4">
+                        No contacts found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    filteredContacts.map((contact) => (
+                      <TableRow key={contact?._id || Math.random()}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <div className="font-medium">{contact?.fullName || 'N/A'}</div>
+                            <div className="text-xs text-muted-foreground sm:hidden">{contact?.company || 'N/A'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">{contact?.company || 'N/A'}</TableCell>
+                        <TableCell className="max-w-[180px] truncate">{contact?.email || 'N/A'}</TableCell>
+                        <TableCell className="hidden md:table-cell">{contact?.role || '-'}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <div className="space-y-1">
+                            {contact?.workPhone && (
+                              <div className="text-xs text-muted-foreground">Work: {contact.workPhone}</div>
+                            )}
+                            {contact?.mobilePhone && (
+                              <div className="text-xs text-muted-foreground">Mobile: {contact.mobilePhone}</div>
+                            )}
+                            {!contact?.workPhone && !contact?.mobilePhone && '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {contact?.city || contact?.state ? (
+                            <div className="text-xs">
+                              {contact?.city && contact?.state ? `${contact.city}, ${contact.state}` : contact?.city || contact?.state}
+                            </div>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{contact?.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-1 sm:space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(contact)}>
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDelete(contact?._id || '')}>
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

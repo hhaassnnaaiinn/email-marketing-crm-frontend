@@ -118,8 +118,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -138,34 +138,34 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to your Email Marketing CRM dashboard</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1">Welcome to your Email Marketing CRM dashboard</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
           <Link key={card.title} href={card.href}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                <CardTitle className="text-xs sm:text-sm font-medium">{card.title}</CardTitle>
                 <card.icon className={`h-4 w-4 ${card.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{card.value}</div>
-                <p className="text-xs text-muted-foreground">{card.description}</p>
+                <div className="text-xl sm:text-2xl font-bold">{card.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
               </CardContent>
             </Card>
           </Link>
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Email Performance</CardTitle>
-            <CardDescription>Overview of your email delivery statistics</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Email Performance</CardTitle>
+            <CardDescription className="text-sm">Overview of your email delivery statistics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
@@ -199,8 +199,8 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest email activity in your CRM</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Recent Activity</CardTitle>
+            <CardDescription className="text-sm">Latest email activity in your CRM</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -210,9 +210,9 @@ export default function DashboardPage() {
                 recentActivity.map((activity, index) => (
                   <div key={index} className="flex items-start space-x-2">
                     {activity.type === "sent" ? (
-                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
+                      <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 truncate">{activity.message}</p>
@@ -228,33 +228,33 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks to get you started</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
+          <CardDescription className="text-sm">Common tasks to get you started</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <Link href="/dashboard/contacts">
-              <Button variant="outline" className="w-full justify-start">
-                <Users className="h-4 w-4 mr-2" />
-                Add Contacts
+              <Button variant="outline" className="w-full justify-start h-auto py-3">
+                <Users className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Add Contacts</span>
               </Button>
             </Link>
             <Link href="/dashboard/templates">
-              <Button variant="outline" className="w-full justify-start">
-                <FileText className="h-4 w-4 mr-2" />
-                Create Template
+              <Button variant="outline" className="w-full justify-start h-auto py-3">
+                <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Create Template</span>
               </Button>
             </Link>
             <Link href="/dashboard/campaigns">
-              <Button variant="outline" className="w-full justify-start">
-                <Send className="h-4 w-4 mr-2" />
-                New Campaign
+              <Button variant="outline" className="w-full justify-start h-auto py-3">
+                <Send className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">New Campaign</span>
               </Button>
             </Link>
             <Link href="/dashboard/bulk-email">
-              <Button variant="outline" className="w-full justify-start">
-                <Mail className="h-4 w-4 mr-2" />
-                Send Bulk Email
+              <Button variant="outline" className="w-full justify-start h-auto py-3">
+                <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span className="text-sm">Send Bulk Email</span>
               </Button>
             </Link>
           </div>
