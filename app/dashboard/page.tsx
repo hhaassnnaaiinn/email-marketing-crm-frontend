@@ -39,37 +39,33 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [contacts, templates, campaigns, emailHistory] = await Promise.all([
+        const [contacts, templates, campaigns, sentEmails, failedEmails, totalEmails] = await Promise.all([
           apiClient.getContacts(),
           apiClient.getTemplates(),
           apiClient.getCampaigns(),
-          apiClient.getEmailHistory({ limit: 100 }),
+          apiClient.getEmailHistory({ status: "sent" }),
+          apiClient.getEmailHistory({ status: "failed" }),
+          apiClient.getEmailHistory(),
         ])
-
-        const emailStats = emailHistory.emails.reduce(
-          (acc: any, email: any) => {
-            acc.total++
-            if (email.status === "sent") acc.sent++
-            if (email.status === "failed") acc.failed++
-            return acc
-          },
-          { sent: 0, failed: 0, total: 0 },
-        )
 
         setStats({
           contacts: contacts.length || 0,
           templates: templates.length || 0,
           campaigns: campaigns.length || 0,
           sentEmails: campaigns.filter((c: any) => c.status === "sent").length || 0,
-          emailHistory: emailStats,
+          emailHistory: {
+            sent: sentEmails.pagination?.totalItems || 0,
+            failed: failedEmails.pagination?.totalItems || 0,
+            total: totalEmails.pagination?.totalItems || 0,
+          },
         })
 
-        // Generate recent activity from email history
-        const activity = emailHistory.emails.slice(0, 5).map((email: any) => ({
+        // Generate recent activity from total email history
+        const activity = totalEmails.emails?.slice(0, 5).map((email: any) => ({
           type: email.status,
           message: `Email "${email.subject}" ${email.status === "sent" ? "sent to" : "failed for"} ${email.to}`,
           timestamp: email.createdAt,
-        }))
+        })) || []
         setRecentActivity(activity)
       } catch (error) {
         console.error("Failed to fetch stats:", error)
