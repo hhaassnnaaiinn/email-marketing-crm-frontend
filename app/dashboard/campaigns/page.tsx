@@ -83,6 +83,7 @@ export default function CampaignsPage() {
     templateId: "", // <-- use templateId
     scheduledAt: "",
   })
+  const [recipientSearchTerm, setRecipientSearchTerm] = useState("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -135,6 +136,7 @@ export default function CampaignsPage() {
       setEditingCampaign(null)
       setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
       setSelectedContacts([])
+      setRecipientSearchTerm("")
       fetchData()
     } catch (error) {
       toast({
@@ -154,6 +156,7 @@ export default function CampaignsPage() {
       scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : "",
     })
     setSelectedContacts(campaign.contacts.map((c) => c._id))
+    setRecipientSearchTerm("")
     setIsDialogOpen(true)
   }
 
@@ -219,11 +222,27 @@ export default function CampaignsPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedContacts(contacts.map((c) => c._id))
+      // Select all filtered contacts
+      const filteredContactIds = filteredContacts.map((c) => c._id)
+      setSelectedContacts([...new Set([...selectedContacts, ...filteredContactIds])])
     } else {
-      setSelectedContacts([])
+      // Deselect all filtered contacts
+      const filteredContactIds = filteredContacts.map((c) => c._id)
+      setSelectedContacts(selectedContacts.filter((id) => !filteredContactIds.includes(id)))
     }
   }
+
+  // Filter contacts based on search term
+  const filteredContacts = contacts.filter((contact) => {
+    const firstName = contact.firstName || ""
+    const lastName = contact.lastName || ""
+    const email = contact.email || ""
+    const searchTerm = recipientSearchTerm.toLowerCase()
+    
+    return firstName.toLowerCase().includes(searchTerm) ||
+           lastName.toLowerCase().includes(searchTerm) ||
+           email.toLowerCase().includes(searchTerm)
+  })
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -273,6 +292,7 @@ export default function CampaignsPage() {
                 setEditingCampaign(null)
                 setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
                 setSelectedContacts([])
+                setRecipientSearchTerm("")
               }}
               className="w-full sm:w-auto"
             >
@@ -280,57 +300,59 @@ export default function CampaignsPage() {
               Create Campaign
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden">
+            <DialogHeader className="pb-4">
               <DialogTitle>{editingCampaign ? "Edit Campaign" : "Create New Campaign"}</DialogTitle>
               <DialogDescription>
                 {editingCampaign ? "Update the campaign information below." : "Create a new email marketing campaign."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="flex flex-col h-full">
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Campaign Name</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name" className="text-sm">Campaign Name</Label>
                     <Input
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Enter campaign name"
                       required
+                      className="h-9"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="scheduledAt">Schedule Date & Time</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="scheduledAt" className="text-sm">Schedule Date & Time</Label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                       <Input
                         id="scheduledAt"
                         type="datetime-local"
                         value={formData.scheduledAt}
                         onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                        className="pl-10"
+                        className="pl-10 h-9"
                       />
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="subject">Email Subject</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="subject" className="text-sm">Email Subject</Label>
                   <Input
                     id="subject"
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     placeholder="Enter email subject"
                     required
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="templateId">Template</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="templateId" className="text-sm">Template</Label>
                   <Select
                     value={formData.templateId}
                     onValueChange={(value) => setFormData({ ...formData, templateId: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select a template" />
                     </SelectTrigger>
                     <SelectContent>
@@ -342,37 +364,55 @@ export default function CampaignsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Recipients ({selectedContacts.length} selected)</Label>
-                  <div className="border rounded-md p-4 max-h-48 overflow-y-auto">
-                    <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Recipients ({selectedContacts.length} selected)</Label>
+                  <div className="border rounded-md p-3 max-h-32 overflow-y-auto">
+                    <div className="space-y-1.5">
+                      {/* Search input */}
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+                        <Input
+                          placeholder="Search contacts..."
+                          value={recipientSearchTerm}
+                          onChange={(e) => setRecipientSearchTerm(e.target.value)}
+                          className="pl-8 h-8 text-xs"
+                        />
+                      </div>
                       <div className="flex items-center space-x-2 pb-2 border-b">
                         <Checkbox
                           id="select-all-contacts"
-                          checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                          checked={filteredContacts.length > 0 && filteredContacts.every(contact => selectedContacts.includes(contact._id))}
                           onCheckedChange={handleSelectAll}
                         />
-                        <Label htmlFor="select-all-contacts" className="text-sm font-medium">
-                          Select All ({contacts.length} contacts)
+                        <Label htmlFor="select-all-contacts" className="text-xs font-medium">
+                          Select All ({filteredContacts.length} contacts)
                         </Label>
                       </div>
-                      {contacts.map((contact) => (
-                        <div key={contact._id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={contact._id}
-                            checked={selectedContacts.includes(contact._id)}
-                            onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
-                          />
-                          <Label htmlFor={contact._id} className="text-sm">
-                            {contact.firstName} {contact.lastName} ({contact.email})
-                          </Label>
-                        </div>
-                      ))}
+                      <div className="space-y-1 max-h-150 overflow-y-auto">
+                        {filteredContacts.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-2">
+                            {recipientSearchTerm ? "No contacts found" : "No contacts available"}
+                          </p>
+                        ) : (
+                          filteredContacts.map((contact) => (
+                            <div key={contact._id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={contact._id}
+                                checked={selectedContacts.includes(contact._id)}
+                                onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
+                              />
+                              <Label htmlFor={contact._id} className="text-xs">
+                                {(contact.firstName || "")} {(contact.lastName || "")} ({(contact.email || "")})
+                              </Label>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <DialogFooter className="mt-6">
+              <DialogFooter className="pt-4 border-t mt-4">
                 <Button type="submit" className="w-full sm:w-auto">{editingCampaign ? "Update Campaign" : "Create Campaign"}</Button>
               </DialogFooter>
             </form>
@@ -413,7 +453,7 @@ export default function CampaignsPage() {
                 <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
                   {viewingCampaign.contacts.map((contact) => (
                     <p key={contact._id} className="text-sm text-muted-foreground">
-                      {contact.firstName} {contact.lastName} ({contact.email})
+                      {(contact.firstName || "")} {(contact.lastName || "")} ({(contact.email || "")})
                     </p>
                   ))}
                 </div>
@@ -422,7 +462,7 @@ export default function CampaignsPage() {
                 <Label className="text-sm font-medium">Email Content</Label>
                 <div
                   className="mt-2 p-4 border rounded-md bg-gray-50 max-h-64 overflow-y-auto overflow-x-auto"
-                  dangerouslySetInnerHTML={{ __html: viewingCampaign.template?.body || "" }}
+                  dangerouslySetInnerHTML={{ __html: templates.find(t => t._id === viewingCampaign.templateId)?.body || "" }}
                 />
               </div>
             </div>
