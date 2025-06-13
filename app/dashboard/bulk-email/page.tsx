@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { Send, Users, Mail } from "lucide-react"
+import { Send, Users, Mail, Search } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { RichTextEditor } from "@/components/rich-text-editor"
@@ -24,6 +24,7 @@ interface Contact {
 export default function BulkEmailPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
   const [emailData, setEmailData] = useState({
     subject: "",
     html: "",
@@ -53,6 +54,15 @@ export default function BulkEmailPage() {
     }
   }
 
+  // Filter contacts based on search query
+  const filteredContacts = contacts.filter((contact) => {
+    const fullName = `${contact.firstName} ${contact.lastName}`.toLowerCase()
+    const email = contact.email.toLowerCase()
+    const query = searchQuery.toLowerCase()
+    
+    return fullName.includes(query) || email.includes(query)
+  })
+
   const handleContactSelection = (contactId: string, checked: boolean) => {
     if (checked) {
       setSelectedContacts([...selectedContacts, contactId])
@@ -63,8 +73,10 @@ export default function BulkEmailPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedContacts(contacts.map((c) => c._id))
+      // Select all filtered contacts
+      setSelectedContacts(filteredContacts.map((c) => c._id))
     } else {
+      // Deselect all contacts
       setSelectedContacts([])
     }
   }
@@ -201,35 +213,52 @@ export default function BulkEmailPage() {
               <div className="text-center py-4">Loading contacts...</div>
             ) : (
               <div className="space-y-4">
+                {/* Search Field */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search contacts by name or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="select-all"
-                    checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                    checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0}
                     onCheckedChange={handleSelectAll}
                   />
                   <Label htmlFor="select-all" className="font-medium text-sm">
-                    Select All ({contacts.length} contacts)
+                    Select All ({filteredContacts.length} contacts)
                   </Label>
                 </div>
                 <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
                   <div className="space-y-2">
-                    {contacts.map((contact) => (
-                      <div key={contact._id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={contact._id}
-                          checked={selectedContacts.includes(contact._id)}
-                          onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
-                        />
-                        <Label htmlFor={contact._id} className="text-sm flex-1">
-                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                            <span>
-                              {contact.firstName} {contact.lastName}
-                            </span>
-                            <span className="text-muted-foreground text-xs sm:text-sm">{contact.email}</span>
-                          </div>
-                        </Label>
+                    {filteredContacts.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        {searchQuery ? "No contacts found matching your search." : "No contacts available."}
                       </div>
-                    ))}
+                    ) : (
+                      filteredContacts.map((contact) => (
+                        <div key={contact._id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={contact._id}
+                            checked={selectedContacts.includes(contact._id)}
+                            onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
+                          />
+                          <Label htmlFor={contact._id} className="text-sm flex-1">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                              <span>
+                                {contact.firstName} {contact.lastName}
+                              </span>
+                              <span className="text-muted-foreground text-xs sm:text-sm">{contact.email}</span>
+                            </div>
+                          </Label>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
                 {selectedContacts.length > 0 && (

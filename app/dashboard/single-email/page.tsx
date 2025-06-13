@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Send, Mail, User } from "lucide-react"
+import { Send, Mail, User, Search } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { RichTextEditor } from "@/components/rich-text-editor"
@@ -30,6 +30,7 @@ interface Template {
 export default function SingleEmailPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [contactSearchQuery, setContactSearchQuery] = useState("")
   const [emailData, setEmailData] = useState({
     to: "",
     subject: "",
@@ -39,6 +40,15 @@ export default function SingleEmailPage() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const { toast } = useToast()
+
+  // Filter contacts based on search query
+  const filteredContacts = contacts.filter((contact) => {
+    const fullName = `${contact.firstName} ${contact.lastName}`.toLowerCase()
+    const email = contact.email.toLowerCase()
+    const query = contactSearchQuery.toLowerCase()
+    
+    return fullName.includes(query) || email.includes(query)
+  })
 
   useEffect(() => {
     fetchData()
@@ -111,6 +121,7 @@ export default function SingleEmailPage() {
       // Reset form
       setEmailData({ to: "", subject: "", html: "" })
       setSelectedTemplate("")
+      setContactSearchQuery("") // Clear search query on successful send
     } catch (error) {
       // Check if the error is about unsubscribed recipient
       const errorMessage = error instanceof Error ? error.message : "Failed to send email"
@@ -218,18 +229,44 @@ export default function SingleEmailPage() {
             {/* Contact Selection */}
             <div className="space-y-2">
               <Label>Select Contact</Label>
-              <Select onValueChange={handleContactSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a contact" />
-                </SelectTrigger>
-                <SelectContent>
-                  {contacts.map((contact) => (
-                    <SelectItem key={contact._id} value={contact._id}>
-                      {contact.firstName} {contact.lastName} ({contact.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search contacts by name or email..."
+                  value={contactSearchQuery}
+                  onChange={(e) => setContactSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
+                <div className="space-y-2">
+                  {loading ? (
+                    <div className="text-center py-4">Loading contacts...</div>
+                  ) : filteredContacts.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      {contactSearchQuery ? "No contacts found matching your search." : "No contacts available."}
+                    </div>
+                  ) : (
+                    filteredContacts.map((contact) => (
+                      <div
+                        key={contact._id}
+                        className={`flex items-center space-x-2 cursor-pointer p-2 rounded-md transition-colors \
+                          ${emailData.to === contact.email ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
+                        onClick={() => handleContactSelect(contact._id)}
+                      >
+                        <span className="text-sm flex-1">
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
+                            <span>
+                              {contact.firstName} {contact.lastName}
+                            </span>
+                            <span className="text-muted-foreground text-xs sm:text-sm">{contact.email}</span>
+                          </div>
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Quick Stats */}
