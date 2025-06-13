@@ -187,6 +187,7 @@ export class ApiClient {
     secretAccessKey: string
     region: string
     fromEmail: string
+    fromName: string
   }) {
     return this.request("/aws-settings", {
       method: "PUT",

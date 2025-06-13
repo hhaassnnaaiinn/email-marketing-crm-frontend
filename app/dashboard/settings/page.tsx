@@ -21,6 +21,7 @@ interface AwsSettings {
   secretAccessKey: string
   region: string
   fromEmail: string
+  fromName: string
   isVerified: boolean
 }
 
@@ -30,6 +31,7 @@ export default function SettingsPage() {
     secretAccessKey: "",
     region: "us-east-1",
     fromEmail: "",
+    fromName: "",
     isVerified: false,
   })
   const [userProfile, setUserProfile] = useState({
@@ -55,6 +57,7 @@ export default function SettingsPage() {
           secretAccessKey: "", // Don't show the actual secret key
           region: settings.region || "us-east-1",
           fromEmail: settings.fromEmail || "",
+          fromName: settings.fromName || "",
           isVerified: settings.isVerified || false,
         })
       }
@@ -266,6 +269,17 @@ export default function SettingsPage() {
                   value={awsSettings.fromEmail || ""}
                   onChange={(e) => setAwsSettings({ ...awsSettings, fromEmail: e.target.value || "" })}
                   placeholder="noreply@yourdomain.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fromName">From Name</Label>
+                <Input
+                  id="fromName"
+                  type="text"
+                  value={awsSettings.fromName || ""}
+                  onChange={(e) => setAwsSettings({ ...awsSettings, fromName: e.target.value || "" })}
+                  placeholder="Your Name"
                   required
                 />
               </div>
