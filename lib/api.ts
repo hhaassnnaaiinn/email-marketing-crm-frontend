@@ -236,6 +236,66 @@ export class ApiClient {
   async checkUnsubscribeStatus(email: string, userId: string) {
     return this.request(`/email/unsubscribe/status?email=${email}&userId=${userId}`)
   }
+
+  // Email Validation and Preview
+  async validateEmailContent(subject: string, html: string) {
+    return this.request("/email/validate", {
+      method: "POST",
+      body: JSON.stringify({ subject, html }),
+    })
+  }
+
+  async previewEmail(subject: string, html: string, sampleContact: any) {
+    return this.request("/email/preview", {
+      method: "POST",
+      body: JSON.stringify({ subject, html, sampleContact }),
+    })
+  }
+
+  // Image Upload
+  async uploadImage(file: File) {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const url = `${API_BASE_URL}/images/upload`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Image upload failed" }))
+      throw new Error(error.message || "Image upload failed")
+    }
+
+    return response.json()
+  }
+
+  async uploadMultipleImages(files: File[]) {
+    const formData = new FormData()
+    files.forEach((file, index) => {
+      formData.append('images', file)
+    })
+
+    const url = `${API_BASE_URL}/images/upload-multiple`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: "Multiple image upload failed" }))
+      throw new Error(error.message || "Multiple image upload failed")
+    }
+
+    return response.json()
+  }
 }
 
 export const apiClient = new ApiClient()

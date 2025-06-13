@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { Send, Users, Mail, Search } from "lucide-react"
+import { Send, Users, Mail, Search, User } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { RichTextEditor } from "@/components/rich-text-editor"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Contact {
   _id: string
@@ -21,14 +22,22 @@ interface Contact {
   email: string
 }
 
+interface Template {
+  _id: string
+  name: string
+  subject: string
+  body: string
+}
+
 export default function BulkEmailPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedTemplate, setSelectedTemplate] = useState("")
   const [emailData, setEmailData] = useState({
     subject: "",
     html: "",
-    batchSize: 50,
   })
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -41,16 +50,29 @@ export default function BulkEmailPage() {
   const fetchContacts = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.getContacts()
-      setContacts(data)
+      const [contactsData, templatesData] = await Promise.all([apiClient.getContacts(), apiClient.getTemplates()])
+      setContacts(contactsData)
+      setTemplates(templatesData)
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to fetch contacts",
+        description: "Failed to fetch data",
         variant: "destructive",
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId)
+    const template = templates.find((t) => t._id === templateId)
+    if (template) {
+      setEmailData({
+        ...emailData,
+        subject: template.subject,
+        html: template.body,
+      })
     }
   }
 
@@ -101,7 +123,6 @@ export default function BulkEmailPage() {
         recipients: selectedEmails,
         subject: emailData.subject,
         html: emailData.html,
-        batchSize: emailData.batchSize,
       })
 
       toast({
@@ -110,8 +131,9 @@ export default function BulkEmailPage() {
       })
 
       // Reset form
-      setEmailData({ subject: "", html: "", batchSize: 50 })
+      setEmailData({ subject: "", html: "" })
       setSelectedContacts([])
+      setSelectedTemplate("")
     } catch (error) {
       // Check if the error is about unsubscribed recipient
       const errorMessage = error instanceof Error ? error.message : "Failed to send bulk email"
@@ -176,19 +198,6 @@ export default function BulkEmailPage() {
                 placeholder="Enter your email content..."
                 required
               />
-              <div className="space-y-2">
-                <Label htmlFor="batchSize">Batch Size</Label>
-                <Input
-                  id="batchSize"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={emailData.batchSize}
-                  onChange={(e) => setEmailData({ ...emailData, batchSize: Number.parseInt(e.target.value) })}
-                  placeholder="50"
-                />
-                <p className="text-xs text-muted-foreground">Number of emails to send per batch (recommended: 50)</p>
-              </div>
               <Button type="submit" disabled={sending || selectedContacts.length === 0} className="w-full">
                 {sending ? "Sending..." : `Send to ${selectedContacts.length} Recipients`}
                 <Send className="h-4 w-4 ml-2" />
@@ -197,51 +206,66 @@ export default function BulkEmailPage() {
           </CardContent>
         </Card>
 
-        {/* Recipient Selection */}
+        {/* Quick Actions */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-lg sm:text-xl">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span>Select Recipients</span>
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span>Quick Actions</span>
             </CardTitle>
-            <CardDescription className="text-sm">
-              Choose contacts to receive your bulk email ({selectedContacts.length} of {contacts.length} selected)
-            </CardDescription>
+            <CardDescription className="text-sm">Use templates and contacts to speed up composition</CardDescription>
           </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-4">Loading contacts...</div>
-            ) : (
-              <div className="space-y-4">
-                {/* Search Field */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search contacts by name or email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <Label htmlFor="select-all" className="font-medium text-sm">
-                    Select All ({filteredContacts.length} contacts)
-                  </Label>
-                </div>
-                <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
-                  <div className="space-y-2">
-                    {filteredContacts.length === 0 ? (
-                      <div className="text-center py-4 text-muted-foreground">
-                        {searchQuery ? "No contacts found matching your search." : "No contacts available."}
+          <CardContent className="space-y-4">
+            {/* Template Selection */}
+            <div className="space-y-2">
+              <Label>Use Template</Label>
+              <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((template) => (
+                    <SelectItem key={template._id} value={template._id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Contact Selection */}
+            <div className="space-y-2">
+              <Label>Select Contacts</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search contacts by name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
+                <div className="space-y-2">
+                  {loading ? (
+                    <div className="text-center py-4">Loading contacts...</div>
+                  ) : filteredContacts.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      {searchQuery ? "No contacts found matching your search." : "No contacts available."}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="select-all"
+                          checked={selectedContacts.length === filteredContacts.length && filteredContacts.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                        <Label htmlFor="select-all" className="font-medium text-sm">
+                          Select All ({filteredContacts.length} contacts)
+                        </Label>
                       </div>
-                    ) : (
-                      filteredContacts.map((contact) => (
+                      {filteredContacts.map((contact) => (
                         <div key={contact._id} className="flex items-center space-x-2">
                           <Checkbox
                             id={contact._id}
@@ -257,19 +281,30 @@ export default function BulkEmailPage() {
                             </div>
                           </Label>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      ))}
+                    </>
+                  )}
                 </div>
-                {selectedContacts.length > 0 && (
-                  <div className="mt-4">
-                    <Badge variant="secondary">
-                      {selectedContacts.length} recipient{selectedContacts.length !== 1 ? "s" : ""} selected
-                    </Badge>
-                  </div>
-                )}
               </div>
-            )}
+            </div>
+
+            {/* Quick Stats */}
+            <div className="pt-4 border-t">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Available Templates:</span>
+                  <span className="font-medium">{templates.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Available Contacts:</span>
+                  <span className="font-medium">{contacts.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Selected Recipients:</span>
+                  <span className="font-medium">{selectedContacts.length}</span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
