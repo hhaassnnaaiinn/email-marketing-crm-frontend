@@ -1,11 +1,63 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
+// Global error handler to prevent authentication errors from being logged
+const handleGlobalError = (event: ErrorEvent) => {
+  if (event.error?.name === "AuthenticationError" || 
+      event.error?.message?.includes("Authentication failed")) {
+    event.preventDefault()
+    return false
+  }
+}
+
+// Global unhandled promise rejection handler
+const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+  if (event.reason?.name === "AuthenticationError" || 
+      event.reason?.message?.includes("Authentication failed")) {
+    event.preventDefault()
+    return false
+  }
+}
+
+// Add global error handlers if in browser
+if (typeof window !== "undefined") {
+  window.addEventListener('error', handleGlobalError)
+  window.addEventListener('unhandledrejection', handleUnhandledRejection)
+  
+  // Cleanup function (for development purposes)
+  if (process.env.NODE_ENV === 'development') {
+    window.addEventListener('beforeunload', () => {
+      window.removeEventListener('error', handleGlobalError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    })
+  }
+}
+
 export class ApiClient {
   private token: string | null = null
+  private onAuthError: (() => void) | null = null
 
   constructor() {
     if (typeof window !== "undefined") {
       this.token = localStorage.getItem("token")
+    }
+  }
+
+  setAuthErrorHandler(handler: () => void) {
+    this.onAuthError = handler
+  }
+
+  updateToken(newToken: string) {
+    this.token = newToken
+    if (typeof window !== "undefined") {
+      localStorage.setItem("token", newToken)
+    }
+  }
+
+  clearToken() {
+    this.token = null
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
     }
   }
 
@@ -20,14 +72,44 @@ export class ApiClient {
       ...options,
     }
 
-    const response = await fetch(url, config)
+    try {
+      const response = await fetch(url, config)
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Network error" }))
-      throw new Error(error.message || "Request failed")
+      if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          // Clear token and trigger logout
+          this.clearToken()
+          
+          // Call auth error handler if set
+          if (this.onAuthError) {
+            this.onAuthError()
+          }
+          
+          // Create a custom error that won't be logged as uncaught
+          const authError = new Error("Authentication failed. Please login again.")
+          authError.name = "AuthenticationError"
+          throw authError
+        }
+        
+        const error = await response.json().catch(() => ({ message: "Network error" }))
+        throw new Error(error.message || "Request failed")
+      }
+
+      return response.json()
+    } catch (error) {
+      // Re-throw authentication errors as-is
+      if (error instanceof Error && error.name === "AuthenticationError") {
+        throw error
+      }
+      
+      // For other errors, ensure they have a proper message
+      if (error instanceof Error) {
+        throw error
+      }
+      
+      throw new Error("An unexpected error occurred")
     }
-
-    return response.json()
   }
 
   // Users
@@ -39,6 +121,13 @@ export class ApiClient {
     return this.request("/users/me", {
       method: "PUT",
       body: JSON.stringify(userData),
+    })
+  }
+
+  async changePassword(passwordData: { currentPassword: string; newPassword: string }) {
+    return this.request("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(passwordData),
     })
   }
 

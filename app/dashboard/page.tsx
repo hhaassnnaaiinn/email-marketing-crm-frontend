@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, FileText, Send, TrendingUp, Mail, CheckCircle, XCircle } from "lucide-react"
+import { Users, FileText, Send, TrendingUp, Mail, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { apiClient } from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
+import { useAuthError } from "@/hooks/use-auth-error"
 import Link from "next/link"
 
 interface Stats {
@@ -35,10 +38,15 @@ export default function DashboardPage() {
   })
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { logout } = useAuth()
+  const { toast } = useToast()
+  const { handleAuthError } = useAuthError()
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        setError(null)
         const [contacts, templates, campaigns, sentEmails, failedEmails, totalEmails] = await Promise.all([
           apiClient.getContacts(),
           apiClient.getTemplates(),
@@ -67,15 +75,29 @@ export default function DashboardPage() {
           timestamp: email.createdAt,
         })) || []
         setRecentActivity(activity)
-      } catch (error) {
+      } catch (error: any) {
+        // Handle authentication errors silently (they're handled by the auth context)
+        if (error?.name === "AuthenticationError" || error?.message === "Authentication failed. Please login again.") {
+          setError("Your session has expired. Please login again.")
+          // Don't log this error to console as it's expected behavior
+          return
+        }
+        
+        // Log and handle other errors
         console.error("Failed to fetch stats:", error)
+        setError("Failed to load dashboard data. Please try again.")
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
     fetchStats()
-  }, [])
+  }, [toast])
 
   const statCards = [
     {
@@ -128,6 +150,29 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <AlertCircle className="h-12 w-12 text-red-500" />
+              </div>
+              <CardTitle className="text-lg">Unable to Load Dashboard</CardTitle>
+              <CardDescription className="text-sm">{error}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Button onClick={() => window.location.reload()} className="w-full">
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )

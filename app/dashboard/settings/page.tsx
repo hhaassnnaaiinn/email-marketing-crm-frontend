@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Shield, Cloud, User, CheckCircle, XCircle } from "lucide-react"
+import { Shield, Cloud, User, CheckCircle, XCircle, Lock } from "lucide-react"
 import { apiClient } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
@@ -37,9 +37,15 @@ export default function SettingsPage() {
   const [userProfile, setUserProfile] = useState({
     email: "",
   })
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
   const [loading, setLoading] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -145,6 +151,59 @@ export default function SettingsPage() {
     }
   }
 
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate passwords match
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate password strength
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "New password must be at least 6 characters long",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPasswordLoading(true)
+
+    try {
+      await apiClient.changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      })
+      
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      })
+      
+      // Clear the form
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      })
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
   const awsRegions = [
     { value: "us-east-1", label: "US East (N. Virginia)" },
     { value: "us-east-2", label: "US East (Ohio)" },
@@ -188,6 +247,57 @@ export default function SettingsPage() {
               </div>
               <Button type="submit" disabled={profileLoading} className="w-full sm:w-auto">
                 {profileLoading ? "Updating..." : "Update Profile"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Change Password */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-2">
+              <Lock className="h-4 w-4 sm:h-5 sm:w-5" />
+              <CardTitle className="text-lg sm:text-xl">Change Password</CardTitle>
+            </div>
+            <CardDescription className="text-sm">Update your account password</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  placeholder="Enter your current password"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  placeholder="Enter your new password"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  placeholder="Confirm your new password"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={passwordLoading} className="w-full sm:w-auto">
+                {passwordLoading ? "Changing Password..." : "Change Password"}
               </Button>
             </form>
           </CardContent>
