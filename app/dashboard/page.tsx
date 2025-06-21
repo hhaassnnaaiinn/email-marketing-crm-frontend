@@ -57,7 +57,7 @@ export default function DashboardPage() {
         ])
 
         setStats({
-          contacts: contacts.length || 0,
+          contacts: contacts?.pagination?.totalItems || 0,
           templates: templates.length || 0,
           campaigns: campaigns.length || 0,
           sentEmails: campaigns.filter((c: any) => c.status === "sent").length || 0,

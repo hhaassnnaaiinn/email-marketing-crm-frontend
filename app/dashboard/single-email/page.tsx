@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,8 +15,7 @@ import { RichTextEditor } from "@/components/rich-text-editor"
 
 interface Contact {
   _id: string
-  firstName: string
-  lastName: string
+  fullName: string
   email: string
 }
 
@@ -41,26 +40,80 @@ export default function SingleEmailPage() {
   const [sending, setSending] = useState(false)
   const { toast } = useToast()
 
-  // Filter contacts based on search query
-  const filteredContacts = contacts.filter((contact) => {
-    const fullName = `${contact.firstName} ${contact.lastName}`.toLowerCase()
-    const email = contact.email.toLowerCase()
-    const query = contactSearchQuery.toLowerCase()
-    
-    return fullName.includes(query) || email.includes(query)
-  })
+  // Paginated contact selection state
+  const [contactSearch, setContactSearch] = useState("")
+  const [contactPage, setContactPage] = useState(1)
+  const [contactLimit] = useState(10)
+  const [contactTotal, setContactTotal] = useState(0)
+  const [contactLoading, setContactLoading] = useState(false)
+  const [contactList, setContactList] = useState<Contact[]>([])
+  const contactSearchTimeout = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Remove debounce, add explicit search
+  const [pendingSearch, setPendingSearch] = useState("")
+
+  // Search handler
+  const handleContactSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = pendingSearch.trim();
+    setContactSearch(pendingSearch); // This will trigger useEffect
+    setContactPage(1);
+    if (trimmed.length >= 2) {
+      fetchContacts(1, trimmed);
+    } else {
+      fetchContacts(1, "");
+    }
+  }
+
+  // Fetch contacts (paginated)
+  const fetchContacts = async (page = 1, search = "") => {
+    setContactLoading(true)
+    try {
+      const res = await apiClient.getContacts({ page, limit: contactLimit, search })
+      setContactList(Array.isArray(res.contacts) ? res.contacts : [])
+      setContactTotal(res.pagination?.totalItems || 0)
+    } catch (e) {
+      setContactList([])
+      setContactTotal(0)
+    } finally {
+      setContactLoading(false)
+    }
+  }
+
+  // Fetch contacts on mount, page/search change
+  useEffect(() => {
+    // Only fetch on mount or page change, not on every keystroke
+    if (contactPage !== 1) {
+      const trimmed = contactSearch.trim();
+      if (trimmed.length >= 2) {
+        fetchContacts(contactPage, trimmed);
+      } else {
+        fetchContacts(contactPage, "");
+      }
+    }
+    // eslint-disable-next-line
+  }, [contactPage]);
 
   useEffect(() => {
-    fetchData()
+    fetchInitialData()
   }, [])
 
-  const fetchData = async () => {
+  // Fetch templates and first page of contacts on mount
+  const fetchInitialData = async () => {
+    setLoading(true)
+    setContactLoading(true)
     try {
-      setLoading(true)
-      const [contactsData, templatesData] = await Promise.all([apiClient.getContacts(), apiClient.getTemplates()])
-      setContacts(contactsData)
+      const [templatesData, contactsRes] = await Promise.all([
+        apiClient.getTemplates(),
+        apiClient.getContacts({ page: 1, limit: contactLimit })
+      ])
       setTemplates(templatesData)
+      setContactList(Array.isArray(contactsRes.contacts) ? contactsRes.contacts : [])
+      setContactTotal(contactsRes.pagination?.totalItems || 0)
     } catch (error) {
+      setTemplates([])
+      setContactList([])
+      setContactTotal(0)
       toast({
         title: "Error",
         description: "Failed to fetch data",
@@ -68,6 +121,7 @@ export default function SingleEmailPage() {
       })
     } finally {
       setLoading(false)
+      setContactLoading(false)
     }
   }
 
@@ -79,16 +133,6 @@ export default function SingleEmailPage() {
         ...emailData,
         subject: template.subject,
         html: template.body,
-      })
-    }
-  }
-
-  const handleContactSelect = (contactId: string) => {
-    const contact = contacts.find((c) => c._id === contactId)
-    if (contact) {
-      setEmailData({
-        ...emailData,
-        to: contact.email,
       })
     }
   }
@@ -229,42 +273,72 @@ export default function SingleEmailPage() {
             {/* Contact Selection */}
             <div className="space-y-2">
               <Label>Select Contact</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search contacts by name or email..."
-                  value={contactSearchQuery}
-                  onChange={(e) => setContactSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <form onSubmit={handleContactSearch} className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search contacts by name or email..."
+                    value={pendingSearch}
+                    onChange={(e) => setPendingSearch(e.target.value)}
+                    className="pl-10"
+                    disabled={contactLoading}
+                    autoFocus
+                  />
+                </div>
+                <Button type="submit" size="sm" disabled={contactLoading || pendingSearch.trim().length < 2}>
+                  Search
+                </Button>
+              </form>
               <div className="border rounded-md p-4 max-h-96 overflow-y-auto">
                 <div className="space-y-2">
-                  {loading ? (
+                  {contactLoading ? (
                     <div className="text-center py-4">Loading contacts...</div>
-                  ) : filteredContacts.length === 0 ? (
+                  ) : contactList.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
-                      {contactSearchQuery ? "No contacts found matching your search." : "No contacts available."}
+                      {contactSearch.trim().length >= 2 ? "No contacts found matching your search." : "No contacts available."}
                     </div>
                   ) : (
-                    filteredContacts.map((contact) => (
+                    contactList.map((contact) => (
                       <div
                         key={contact._id}
                         className={`flex items-center space-x-2 cursor-pointer p-2 rounded-md transition-colors \
                           ${emailData.to === contact.email ? "bg-accent text-accent-foreground" : "hover:bg-muted"}`}
-                        onClick={() => handleContactSelect(contact._id)}
+                        onClick={() => setEmailData({ ...emailData, to: contact.email })}
                       >
                         <span className="text-sm flex-1">
                           <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
                             <span>
-                              {contact.firstName} {contact.lastName}
+                              <span className="font-medium">{contact.fullName}</span> <span className="text-muted-foreground text-xs sm:text-sm">({contact.email})</span>
                             </span>
-                            <span className="text-muted-foreground text-xs sm:text-sm">{contact.email}</span>
                           </div>
                         </span>
                       </div>
                     ))
                   )}
+                </div>
+                {/* Pagination for contacts */}
+                <div className="flex justify-between items-center pt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={contactPage === 1 || contactLoading}
+                    onClick={() => setContactPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Page {contactPage} of {Math.ceil(contactTotal / contactLimit) || 1}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={contactPage >= Math.ceil(contactTotal / contactLimit) || contactLoading}
+                    onClick={() => setContactPage((p) => Math.min(Math.ceil(contactTotal / contactLimit), p + 1))}
+                  >
+                    Next
+                  </Button>
                 </div>
               </div>
             </div>

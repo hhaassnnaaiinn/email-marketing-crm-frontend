@@ -136,8 +136,14 @@ export class ApiClient {
   }
 
   // Contacts (enhanced)
-  async getContacts() {
-    return this.request("/contacts")
+  async getContacts(params?: { page?: number; limit?: number; search?: string; status?: string }) {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.limit) queryParams.append("limit", params.limit.toString())
+    if (params?.search) queryParams.append("search", params.search)
+    if (params?.status) queryParams.append("status", params.status)
+    const query = queryParams.toString()
+    return this.request(`/contacts${query ? `?${query}` : ""}`)
   }
 
   async createContact(contact: {
@@ -384,6 +390,30 @@ export class ApiClient {
     }
 
     return response.json()
+  }
+
+  // Batch campaign creation for large contact lists
+  async createCampaignBatch(campaign: any) {
+    return this.request("/campaigns/batch", {
+      method: "POST",
+      body: JSON.stringify(campaign),
+    })
+  }
+
+  async getUnsubscribers(params?: { page?: number; limit?: number; search?: string }) {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.limit) queryParams.append("limit", params.limit.toString())
+    if (params?.search) queryParams.append("search", params.search)
+    const query = queryParams.toString()
+    return this.request(`/contacts/unsub${query ? `?${query}` : ""}`)
+  }
+
+  async getContactsByIds(ids: string[]) {
+    return this.request("/contacts/by-ids", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    })
   }
 }
 

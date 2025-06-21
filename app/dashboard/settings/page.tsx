@@ -22,6 +22,7 @@ interface AwsSettings {
   region: string
   fromEmail: string
   fromName: string
+  replyToEmail: string
   isVerified: boolean
 }
 
@@ -32,6 +33,7 @@ export default function SettingsPage() {
     region: "us-east-1",
     fromEmail: "",
     fromName: "",
+    replyToEmail: "",
     isVerified: false,
   })
   const [userProfile, setUserProfile] = useState({
@@ -64,6 +66,7 @@ export default function SettingsPage() {
           region: settings.region || "us-east-1",
           fromEmail: settings.fromEmail || "",
           fromName: settings.fromName || "",
+          replyToEmail: settings.replyToEmail || "",
           isVerified: settings.isVerified || false,
         })
       }
@@ -390,6 +393,17 @@ export default function SettingsPage() {
                   value={awsSettings.fromName || ""}
                   onChange={(e) => setAwsSettings({ ...awsSettings, fromName: e.target.value || "" })}
                   placeholder="Your Name"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="replyToEmail">Reply-To Email Address</Label>
+                <Input
+                  id="replyToEmail"
+                  type="email"
+                  value={awsSettings.replyToEmail || ""}
+                  onChange={(e) => setAwsSettings({ ...awsSettings, replyToEmail: e.target.value || "" })}
+                  placeholder="replyto@yourdomain.com"
                   required
                 />
               </div>

@@ -49,12 +49,23 @@ interface Contact {
   unsubscribed?: boolean
 }
 
+interface ContactsResponse {
+  contacts: Contact[]
+  pagination: {
+    currentPage: number
+    totalPages: number
+    totalItems: number
+    hasNext: boolean
+    hasPrev: boolean
+  }
+}
+
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([])
+  const [contactsData, setContactsData] = useState<ContactsResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
@@ -73,33 +84,89 @@ export default function ContactsPage() {
     email: "",
     unsubscribed: false,
   })
+  const [unsubList, setUnsubList] = useState<any[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchContacts()
-  }, [])
+  }, [currentPage, searchTerm, statusFilter])
 
   const fetchContacts = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.getContacts()
-      
-      // Ensure we have a valid array
-      if (Array.isArray(data)) {
-        setContacts(data)
-      } else {
-        console.error('Invalid contacts data:', data)
-        setContacts([])
-        toast({
-          title: "Warning",
-          description: "Received invalid data format",
-          variant: "destructive",
+      if (statusFilter === "unsubscribed") {
+        // 1. Get unsubscribers (paginated, with search)
+        const unsubData = await apiClient.getUnsubscribers({
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm,
         })
+        const unsubIds = Array.isArray(unsubData.unsubscribers)
+          ? unsubData.unsubscribers.map((u: any) => u.contactId).filter(Boolean)
+          : []
+        let contacts: Contact[] = []
+        if (unsubIds.length > 0) {
+          // 2. Get contacts by IDs
+          const contactsRes = await apiClient.getContactsByIds(unsubIds)
+          contacts = Array.isArray(contactsRes.contacts) ? contactsRes.contacts : []
+        }
+        setContactsData({
+          contacts,
+          pagination: unsubData.pagination || {
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: 0,
+            hasNext: false,
+            hasPrev: false
+          }
+        })
+        setUnsubList(Array.isArray(unsubData.unsubscribers) ? unsubData.unsubscribers : [])
+      } else {
+        setUnsubList([])
+        // Normal contacts fetch
+        const params: any = {
+          page: currentPage,
+          limit: itemsPerPage,
+        }
+        if (searchTerm) params.search = searchTerm
+        if (statusFilter && statusFilter !== "all") params.status = statusFilter
+        const data = await apiClient.getContacts(params)
+        if (data && typeof data === 'object') {
+          setContactsData({
+            contacts: data.contacts || [],
+            pagination: data.pagination || {
+              currentPage: 1,
+              totalPages: 1,
+              totalItems: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          })
+        } else {
+          setContactsData({
+            contacts: [],
+            pagination: {
+              currentPage: 1,
+              totalPages: 1,
+              totalItems: 0,
+              hasNext: false,
+              hasPrev: false
+            }
+          })
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch contacts:', error)
-      setContacts([])
+      setContactsData({
+        contacts: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: 0,
+          hasNext: false,
+          hasPrev: false
+        }
+      })
       toast({
         title: "Error",
         description: "Failed to fetch contacts",
@@ -250,43 +317,13 @@ export default function ContactsPage() {
     }
   }
 
-  // Pagination logic
-  const filteredContacts = contacts.filter(
-    (contact) => {
-      // Text search filter
-      const matchesSearch = 
-        (contact?.fullName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (contact?.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (contact?.company?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (contact?.role?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (contact?.city?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (contact?.state?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-
-      // Status filter
-      let matchesStatus = true
-      if (statusFilter === "subscribed") {
-        matchesStatus = !(contact?.unsubscribed || false)
-      } else if (statusFilter === "unsubscribed") {
-        matchesStatus = contact?.unsubscribed || false
-      }
-
-      return matchesSearch && matchesStatus
-    }
-  )
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredContacts.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentContacts = filteredContacts.slice(startIndex, endIndex)
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchTerm, statusFilter])
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+  }
+
+  // Helper to get unsub info for a contact
+  const getUnsubInfo = (contactId: string) => {
+    return unsubList.find((u) => u.contactId === contactId)
   }
 
   return (
@@ -484,7 +521,7 @@ export default function ContactsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">All Contacts ({contacts?.length || 0})</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">All Contacts ({contactsData?.pagination?.totalItems || 0})</CardTitle>
           <CardDescription className="text-sm">A list of all your email marketing contacts</CardDescription>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="flex items-center space-x-2">
@@ -514,156 +551,174 @@ export default function ContactsPage() {
         <CardContent>
           {loading ? (
             <div className="text-center py-4">Loading contacts...</div>
+          ) : !contactsData ? (
+            <div className="text-center py-4">No contacts found</div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[120px]">Name</TableHead>
-                    <TableHead className="min-w-[120px] hidden sm:table-cell">Company</TableHead>
-                    <TableHead className="min-w-[180px]">Email</TableHead>
-                    <TableHead className="min-w-[100px] hidden md:table-cell">Role</TableHead>
-                    <TableHead className="min-w-[120px] hidden lg:table-cell">Phone</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Location</TableHead>
-                    <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="min-w-[100px] hidden md:table-cell">Created</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentContacts.length === 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-4">
-                        No contacts found
-                      </TableCell>
+                      <TableHead className="min-w-[120px]">Name</TableHead>
+                      <TableHead className="min-w-[120px] hidden sm:table-cell">Company</TableHead>
+                      <TableHead className="min-w-[180px]">Email</TableHead>
+                      <TableHead className="min-w-[100px] hidden md:table-cell">Role</TableHead>
+                      <TableHead className="min-w-[120px] hidden lg:table-cell">Phone</TableHead>
+                      <TableHead className="min-w-[100px] hidden lg:table-cell">Location</TableHead>
+                      <TableHead className="min-w-[120px]">Status</TableHead>
+                      <TableHead className="min-w-[100px] hidden md:table-cell">Created</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    currentContacts.map((contact) => (
-                      <TableRow key={contact?._id || Math.random()}>
-                        <TableCell className="font-medium">
-                          <div>
-                            <div className="font-medium">{contact?.fullName || 'N/A'}</div>
-                            <div className="text-xs text-muted-foreground sm:hidden">{contact?.company || 'N/A'}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">{contact?.company || 'N/A'}</TableCell>
-                        <TableCell className="max-w-[180px] truncate">{contact?.email || 'N/A'}</TableCell>
-                        <TableCell className="hidden md:table-cell">{contact?.role || '-'}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          <div className="space-y-1">
-                            {contact?.workPhone && (
-                              <div className="text-xs text-muted-foreground">Work: {contact.workPhone}</div>
-                            )}
-                            {contact?.mobilePhone && (
-                              <div className="text-xs text-muted-foreground">Mobile: {contact.mobilePhone}</div>
-                            )}
-                            {!contact?.workPhone && !contact?.mobilePhone && '-'}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {contact?.city || contact?.state ? (
-                            <div className="text-xs">
-                              {contact?.city && contact?.state ? `${contact.city}, ${contact.state}` : contact?.city || contact?.state}
-                            </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(contact?.unsubscribed || false)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{contact?.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-1 sm:space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEdit(contact)}>
-                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleDelete(contact?._id || '')}>
-                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {contactsData.contacts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-4">
+                          No contacts found
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          
-          {/* Pagination */}
-          {!loading && filteredContacts.length > 0 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredContacts.length)} of {filteredContacts.length} contacts
+                    ) : (
+                      contactsData.contacts.map((contact) => (
+                        <TableRow key={contact?._id || Math.random()}>
+                          <TableCell className="font-medium">
+                            <div>
+                              <div className="font-medium">{contact?.fullName || 'N/A'}</div>
+                              <div className="text-xs text-muted-foreground sm:hidden">{contact?.company || 'N/A'}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">{contact?.company || 'N/A'}</TableCell>
+                          <TableCell className="max-w-[180px] truncate">{contact?.email || 'N/A'}</TableCell>
+                          <TableCell className="hidden md:table-cell">{contact?.role || '-'}</TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <div className="space-y-1">
+                              {contact?.workPhone && (
+                                <div className="text-xs text-muted-foreground">Work: {contact.workPhone}</div>
+                              )}
+                              {contact?.mobilePhone && (
+                                <div className="text-xs text-muted-foreground">Mobile: {contact.mobilePhone}</div>
+                              )}
+                              {!contact?.workPhone && !contact?.mobilePhone && '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {contact?.city || contact?.state ? (
+                              <div className="text-xs">
+                                {contact?.city && contact?.state ? `${contact.city}, ${contact.state}` : contact?.city || contact?.state}
+                              </div>
+                            ) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {
+                              statusFilter === "unsubscribed"
+                                ? (() => {
+                                    const unsub = getUnsubInfo(contact._id)
+                                    if (unsub) {
+                                      return (
+                                        <span className="flex flex-col gap-1">
+                                          <Badge variant="destructive" className="flex items-center gap-1">
+                                            <MailX className="h-3 w-3" />
+                                            Unsubscribed
+                                          </Badge>
+                                          {unsub.reason && (
+                                            <span className="text-xs text-muted-foreground">{unsub.reason}</span>
+                                          )}
+                                          {unsub.unsubscribedAt && (
+                                            <span className="text-xs text-muted-foreground">{new Date(unsub.unsubscribedAt).toLocaleString()}</span>
+                                          )}
+                                        </span>
+                                      )
+                                    }
+                                    return getStatusBadge(true)
+                                  })()
+                                : getStatusBadge(contact?.unsubscribed || false)
+                            }
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">{contact?.createdAt ? new Date(contact.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-1 sm:space-x-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(contact)}>
+                                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleDelete(contact?._id || '')}>
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
-                  {/* First page */}
-                  {currentPage > 2 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Ellipsis */}
-                  {currentPage > 3 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Previous page */}
-                  {currentPage > 1 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => handlePageChange(currentPage - 1)}>
-                        {currentPage - 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Current page */}
-                  <PaginationItem>
-                    <PaginationLink isActive>{currentPage}</PaginationLink>
-                  </PaginationItem>
-                  
-                  {/* Next page */}
-                  {currentPage < totalPages && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => handlePageChange(currentPage + 1)}>
-                        {currentPage + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Ellipsis */}
-                  {currentPage < totalPages - 2 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Last page */}
-                  {currentPage < totalPages - 1 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => handlePageChange(totalPages)}>{totalPages}</PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+              {/* Pagination */}
+              {contactsData.contacts.length > 0 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {contactsData.pagination.currentPage} to {Math.min(contactsData.pagination.currentPage + itemsPerPage - 1, contactsData.pagination.totalItems)} of {contactsData.pagination.totalItems} contacts
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      {/* First page */}
+                      {currentPage > 2 && (
+                        <PaginationItem>
+                          <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
+                        </PaginationItem>
+                      )}
+                      {/* Ellipsis */}
+                      {currentPage > 3 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      {/* Previous page */}
+                      {currentPage > 1 && (
+                        <PaginationItem>
+                          <PaginationLink onClick={() => handlePageChange(currentPage - 1)}>
+                            {currentPage - 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
+                      {/* Current page */}
+                      <PaginationItem>
+                        <PaginationLink isActive>{currentPage}</PaginationLink>
+                      </PaginationItem>
+                      {/* Next page */}
+                      {currentPage < contactsData.pagination.totalPages && (
+                        <PaginationItem>
+                          <PaginationLink onClick={() => handlePageChange(currentPage + 1)}>
+                            {currentPage + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )}
+                      {/* Ellipsis */}
+                      {currentPage < contactsData.pagination.totalPages - 2 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      {/* Last page */}
+                      {currentPage < contactsData.pagination.totalPages - 1 && (
+                        <PaginationItem>
+                          <PaginationLink onClick={() => handlePageChange(contactsData.pagination.totalPages)}>{contactsData.pagination.totalPages}</PaginationLink>
+                        </PaginationItem>
+                      )}
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(Math.min(contactsData.pagination.totalPages, currentPage + 1))}
+                          className={currentPage === contactsData.pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -64,6 +64,14 @@ interface Contact {
   email: string
 }
 
+// Extend types for runtime safety in view dialog
+interface CampaignWithTemplate extends Campaign {
+  template?: { _id: string; name: string; body: string }
+}
+interface ContactWithFullName extends Contact {
+  fullName?: string
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
@@ -76,15 +84,24 @@ export default function CampaignsPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [viewingCampaign, setViewingCampaign] = useState<Campaign | null>(null)
-  const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [formData, setFormData] = useState({
     name: "",
     subject: "",
     templateId: "", // <-- use templateId
     scheduledAt: "",
   })
-  const [recipientSearchTerm, setRecipientSearchTerm] = useState("")
   const { toast } = useToast()
+
+  // Contact selection state
+  const [contactSearch, setContactSearch] = useState("")
+  const [contactPage, setContactPage] = useState(1)
+  const [contactLimit] = useState(10)
+  const [contactTotal, setContactTotal] = useState(0)
+  const [contactLoading, setContactLoading] = useState(false)
+  const [contactList, setContactList] = useState<Contact[]>([])
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [selectAllPages, setSelectAllPages] = useState(false)
+  const contactSearchTimeout = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -111,6 +128,94 @@ export default function CampaignsPage() {
     }
   }
 
+  // Fetch contacts for selection (paginated)
+  const fetchContacts = async (page = 1, search = "") => {
+    setContactLoading(true)
+    try {
+      const res = await apiClient.getContacts({ page, limit: contactLimit, search })
+      setContactList(Array.isArray(res.contacts) ? res.contacts : [])
+      setContactTotal(res.pagination?.totalItems || 0)
+    } catch (e) {
+      setContactList([])
+      setContactTotal(0)
+    } finally {
+      setContactLoading(false)
+    }
+  }
+
+  // Fetch contacts when dialog opens, page/search changes
+  useEffect(() => {
+    if (isDialogOpen) fetchContacts(contactPage, contactSearch)
+  }, [isDialogOpen, contactPage, contactSearch])
+
+  // Reset contact selection state when dialog opens/closes
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setContactSearch("")
+      setContactPage(1)
+      setContactList([])
+      setContactTotal(0)
+      setSelectedContacts([])
+      setSelectAllPages(false)
+    } else if (editingCampaign) {
+      setSelectedContacts(editingCampaign.contacts.map(c => c._id))
+    }
+  }, [isDialogOpen, editingCampaign])
+
+  // Debounce contact search
+  const handleContactSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setContactSearch(value)
+    setContactPage(1)
+    if (contactSearchTimeout.current) clearTimeout(contactSearchTimeout.current)
+    contactSearchTimeout.current = setTimeout(() => {
+      fetchContacts(1, value)
+    }, 400)
+  }
+
+  // Select all contacts on current page
+  const handleSelectAllOnPage = (checked: boolean) => {
+    if (checked) {
+      const newIds = contactList.map(c => c._id)
+      setSelectedContacts(prev => Array.from(new Set([...prev, ...newIds])))
+    } else {
+      setSelectedContacts(prev => prev.filter(id => !contactList.some(c => c._id === id)))
+    }
+  }
+
+  // Select all contacts across all pages
+  const handleSelectAllPages = async (checked: boolean) => {
+    setSelectAllPages(checked)
+    if (checked) {
+      // Fetch all contact IDs (could be optimized for large sets)
+      setContactLoading(true)
+      try {
+        const allIds: string[] = []
+        let page = 1
+        let done = false
+        while (!done) {
+          const res = await apiClient.getContacts({ page, limit: 1000, search: contactSearch })
+          allIds.push(...(Array.isArray(res.contacts) ? res.contacts.map((c: any) => c._id) : []))
+          if (allIds.length >= (res.pagination?.totalItems || 0)) done = true
+          else page++
+        }
+        setSelectedContacts(allIds)
+      } catch {
+        setSelectedContacts([])
+      } finally {
+        setContactLoading(false)
+      }
+    } else {
+      setSelectedContacts([])
+    }
+  }
+
+  // Handle single contact selection
+  const handleContactCheckbox = (id: string, checked: boolean) => {
+    if (checked) setSelectedContacts(prev => Array.from(new Set([...prev, id])))
+    else setSelectedContacts(prev => prev.filter(cid => cid !== id))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
@@ -118,32 +223,23 @@ export default function CampaignsPage() {
         ...formData,
         contacts: selectedContacts,
       }
-
-      if (editingCampaign) {
+      // Automatically use batch endpoint for large lists
+      if (selectedContacts.length >= 1000) {
+        await apiClient.createCampaignBatch({ ...campaignData, batchSize: 1000 })
+        toast({ title: "Success", description: "Campaign created in batch mode!" })
+      } else if (editingCampaign) {
         await apiClient.updateCampaign(editingCampaign._id, campaignData)
-        toast({
-          title: "Success",
-          description: "Campaign updated successfully",
-        })
+        toast({ title: "Success", description: "Campaign updated successfully" })
       } else {
         await apiClient.createCampaign(campaignData)
-        toast({
-          title: "Success",
-          description: "Campaign created successfully",
-        })
+        toast({ title: "Success", description: "Campaign created successfully" })
       }
       setIsDialogOpen(false)
       setEditingCampaign(null)
       setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
-      setSelectedContacts([])
-      setRecipientSearchTerm("")
       fetchData()
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save campaign",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to save campaign", variant: "destructive" })
     }
   }
 
@@ -155,8 +251,6 @@ export default function CampaignsPage() {
       templateId: campaign.templateId, // <-- use templateId
       scheduledAt: campaign.scheduledAt ? new Date(campaign.scheduledAt).toISOString().slice(0, 16) : "",
     })
-    setSelectedContacts(campaign.contacts.map((c) => c._id))
-    setRecipientSearchTerm("")
     setIsDialogOpen(true)
   }
 
@@ -212,38 +306,6 @@ export default function CampaignsPage() {
     }
   }
 
-  const handleContactSelection = (contactId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedContacts([...selectedContacts, contactId])
-    } else {
-      setSelectedContacts(selectedContacts.filter((id) => id !== contactId))
-    }
-  }
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      // Select all filtered contacts
-      const filteredContactIds = filteredContacts.map((c) => c._id)
-      setSelectedContacts([...new Set([...selectedContacts, ...filteredContactIds])])
-    } else {
-      // Deselect all filtered contacts
-      const filteredContactIds = filteredContacts.map((c) => c._id)
-      setSelectedContacts(selectedContacts.filter((id) => !filteredContactIds.includes(id)))
-    }
-  }
-
-  // Filter contacts based on search term
-  const filteredContacts = contacts.filter((contact) => {
-    const firstName = contact.firstName || ""
-    const lastName = contact.lastName || ""
-    const email = contact.email || ""
-    const searchTerm = recipientSearchTerm.toLowerCase()
-    
-    return firstName.toLowerCase().includes(searchTerm) ||
-           lastName.toLowerCase().includes(searchTerm) ||
-           email.toLowerCase().includes(searchTerm)
-  })
-
   const getStatusBadge = (status: string) => {
     const variants = {
       draft: "secondary",
@@ -291,8 +353,6 @@ export default function CampaignsPage() {
               onClick={() => {
                 setEditingCampaign(null)
                 setFormData({ name: "", subject: "", templateId: "", scheduledAt: "" })
-                setSelectedContacts([])
-                setRecipientSearchTerm("")
               }}
               className="w-full sm:w-auto"
             >
@@ -364,53 +424,96 @@ export default function CampaignsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Recipients ({selectedContacts.length} selected)</Label>
-                  <div className="border rounded-md p-3 max-h-32 overflow-y-auto">
+                {/* Contact selection UI */}
+                {(() => {
+                  const safeContactList = Array.isArray(contactList) ? contactList : [];
+                  return (
                     <div className="space-y-1.5">
-                      {/* Search input */}
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
-                        <Input
-                          placeholder="Search contacts..."
-                          value={recipientSearchTerm}
-                          onChange={(e) => setRecipientSearchTerm(e.target.value)}
-                          className="pl-8 h-8 text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center space-x-2 pb-2 border-b">
-                        <Checkbox
-                          id="select-all-contacts"
-                          checked={filteredContacts.length > 0 && filteredContacts.every(contact => selectedContacts.includes(contact._id))}
-                          onCheckedChange={handleSelectAll}
-                        />
-                        <Label htmlFor="select-all-contacts" className="text-xs font-medium">
-                          Select All ({filteredContacts.length} contacts)
-                        </Label>
-                      </div>
-                      <div className="space-y-1 max-h-150 overflow-y-auto">
-                        {filteredContacts.length === 0 ? (
-                          <p className="text-xs text-muted-foreground text-center py-2">
-                            {recipientSearchTerm ? "No contacts found" : "No contacts available"}
-                          </p>
-                        ) : (
-                          filteredContacts.map((contact) => (
-                            <div key={contact._id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={contact._id}
-                                checked={selectedContacts.includes(contact._id)}
-                                onCheckedChange={(checked) => handleContactSelection(contact._id, checked as boolean)}
-                              />
-                              <Label htmlFor={contact._id} className="text-xs">
-                                {(contact.firstName || "")} {(contact.lastName || "")} ({(contact.email || "")})
-                              </Label>
-                            </div>
-                          ))
-                        )}
+                      <Label className="text-sm">Recipients ({selectedContacts.length} selected{selectAllPages ? ", all pages" : ""})</Label>
+                      <div className="border rounded-md p-3 max-h-48 overflow-y-auto">
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+                            <Input
+                              placeholder="Search contacts..."
+                              value={contactSearch}
+                              onChange={handleContactSearchChange}
+                              className="pl-8 h-8 text-xs"
+                              disabled={contactLoading}
+                            />
+                          </div>
+                          <div className="flex items-center space-x-2 pb-2 border-b">
+                            <Checkbox
+                              id="select-all-contacts-page"
+                              checked={safeContactList.length > 0 && safeContactList.every(c => selectedContacts.includes(c._id))}
+                              onCheckedChange={handleSelectAllOnPage}
+                              disabled={contactLoading}
+                            />
+                            <Label htmlFor="select-all-contacts-page" className="text-xs font-medium">
+                              Select All on Page ({safeContactList.length} contacts)
+                            </Label>
+                            <Checkbox
+                              id="select-all-contacts-all"
+                              checked={selectAllPages}
+                              onCheckedChange={handleSelectAllPages}
+                              disabled={contactLoading}
+                            />
+                            <Label htmlFor="select-all-contacts-all" className="text-xs font-medium">
+                              Select All ({contactTotal} contacts)
+                            </Label>
+                          </div>
+                          <div className="space-y-1 max-h-40 overflow-y-auto">
+                            {contactLoading ? (
+                              <p className="text-xs text-muted-foreground text-center py-2">Loading contacts...</p>
+                            ) : safeContactList.length === 0 ? (
+                              <p className="text-xs text-muted-foreground text-center py-2">
+                                {contactSearch ? "No contacts found" : "No contacts available"}
+                              </p>
+                            ) : (
+                              safeContactList.map((contact) => (
+                                <div key={contact._id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={contact._id}
+                                    checked={selectedContacts.includes(contact._id)}
+                                    onCheckedChange={(checked) => handleContactCheckbox(contact._id, checked as boolean)}
+                                    disabled={contactLoading}
+                                  />
+                                  <Label htmlFor={contact._id} className="text-xs">
+                                    {(contact.firstName || "")} {(contact.lastName || "")} ({(contact.email || "")})
+                                  </Label>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                          {/* Pagination for contacts */}
+                          <div className="flex justify-between items-center pt-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={contactPage === 1 || contactLoading}
+                              onClick={() => setContactPage((p) => Math.max(1, p - 1))}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-xs text-muted-foreground">
+                              Page {contactPage} of {Math.ceil(contactTotal / contactLimit) || 1}
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={contactPage >= Math.ceil(contactTotal / contactLimit) || contactLoading}
+                              onClick={() => setContactPage((p) => Math.min(Math.ceil(contactTotal / contactLimit), p + 1))}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
               <DialogFooter className="pt-4 border-t mt-4">
                 <Button type="submit" className="w-full sm:w-auto">{editingCampaign ? "Update Campaign" : "Create Campaign"}</Button>
@@ -427,45 +530,57 @@ export default function CampaignsPage() {
             <DialogTitle>Campaign Details</DialogTitle>
           </DialogHeader>
           {viewingCampaign && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium">Campaign Name</Label>
-                  <p className="text-sm text-muted-foreground">{viewingCampaign.name}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Status</Label>
-                  <div className="mt-1">{getStatusBadge(viewingCampaign.status)}</div>
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Subject</Label>
-                <p className="text-sm text-muted-foreground">{viewingCampaign.subject}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Template</Label>
-                <p className="text-sm text-muted-foreground">
-                  {templates.find(t => t._id === viewingCampaign.templateId)?.name || "N/A"}
-                </p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Recipients ({viewingCampaign.contacts.length})</Label>
-                <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                  {viewingCampaign.contacts.map((contact) => (
-                    <p key={contact._id} className="text-sm text-muted-foreground">
-                      {(contact.firstName || "")} {(contact.lastName || "")} ({(contact.email || "")})
+            (() => {
+              const campaign: CampaignWithTemplate = viewingCampaign as any
+              return (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Campaign Name</Label>
+                      <p className="text-sm text-muted-foreground">{campaign.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Status</Label>
+                      <div className="mt-1">{getStatusBadge(campaign.status)}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Subject</Label>
+                    <p className="text-sm text-muted-foreground">{campaign.subject}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Template</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {(campaign as any).template?.name || templates.find(t => t._id === (campaign.templateId || (campaign as any).template?._id))?.name || "N/A"}
                     </p>
-                  ))}
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Recipients ({campaign.contacts.length})</Label>
+                    <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                      {campaign.contacts.slice(0, 20).map((contact) => (
+                        <p key={contact._id} className="text-sm text-muted-foreground">
+                          {(contact.firstName || (contact as any).fullName || "")} {(contact.lastName || "")} ({(contact.email || "")})
+                        </p>
+                      ))}
+                      {campaign.contacts.length > 20 && (
+                        <p className="text-xs text-muted-foreground">Showing first 20 of {campaign.contacts.length} recipients.</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Email Content</Label>
+                    <div
+                      className="mt-2 p-4 border rounded-md bg-gray-50 max-h-64 overflow-y-auto overflow-x-auto"
+                      dangerouslySetInnerHTML={{ __html:
+                        (campaign as any).template?.body ||
+                        templates.find(t => t._id === (campaign.templateId || (campaign as any).template?._id))?.body ||
+                        "<em>No content available</em>"
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Email Content</Label>
-                <div
-                  className="mt-2 p-4 border rounded-md bg-gray-50 max-h-64 overflow-y-auto overflow-x-auto"
-                  dangerouslySetInnerHTML={{ __html: templates.find(t => t._id === viewingCampaign.templateId)?.body || "" }}
-                />
-              </div>
-            </div>
+              )
+            })()
           )}
         </DialogContent>
       </Dialog>
@@ -633,3 +748,4 @@ export default function CampaignsPage() {
     </div>
   )
 }
+
